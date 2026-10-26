@@ -41,8 +41,8 @@ Findings from the survey that shape every phase:
  │  · cue engine: the night's true state, saved   │
  │    to disk on every change                     │   plain HTTPS, no Realtime
  │  · outbox: Supabase writes, retried            │◄──── tally poll 1/s ── (console + display only)
- │                                                │                       ~100 audience phones: /vote polls a cached
- │  console window (laptop)  display window (HDMI)│                       "current vote" every 2 to 3 s, one POST per vote
+ │                                                │                       up to 500 audience phones: /vote polls the
+ │  console window (laptop)  display window (HDMI)│                       current vote (database), one POST per vote
  └────────────────────────────────────────────────┘
 ```
 
@@ -74,7 +74,7 @@ Two ways to wrap tv.html. **Decided 2026-10-26 (Josh): A.**
 | 12 cast phones | 1 each (player.html's `game-<code>` channel) | Postgres changes on `games` / `players` / `night_actions` |
 | Host view | 1 | one broadcast per cue change and timer state |
 | Launcher (+ the tv.html it hosts) | 1 or 2 | engine writes, host broadcasts |
-| ~100 audience phones | **none** | GET the cached current vote every 2 to 3 s (Netlify CDN, ~2 s cache, so Supabase sees about one read per 2 s); one POST per vote |
+| up to 500 audience phones | **none** | Read the current vote from the database every 2.5 to 3 s while a vote is open, every 5 to 6 s between votes (Phase 5: the Netlify-cached path got the venue's address cut off at 500 phones); one POST per vote |
 | Console + display | none for votes | tally poll once per second |
 
 That's about 16 connections. Message peaks are an engine write fanned out to ~15 subscribers.
@@ -290,7 +290,7 @@ vote panel).
 
 3. A settings sheet: audio output, the shortcut table, a "test each button" mode.
 
-### Phase 5: load test
+### Phase 5: load test (built 2026-10-26, at 500 phones: see "Phase 5: what's built")
 A Node script that plays 100 voters against the real stack: each phone polls the current vote with jitter, the vote
 opens, all 100 vote within a few seconds, some vote twice (must be refused), some arrive after close (refused). It
 reports request latency, errors, CDN hit rate, and checks the tally equals the accepted ballots. Plus a connection
@@ -362,7 +362,7 @@ database and the live site (`npm run check:night`).
   missing anchor fails the build), with **every script the pages load** (player-2b.js is the 2B player design:
   Vessels Live's build never shipped it, so its phones had the old look) and every asset the phone pages use.
 - `/cast` (the cast hub: private code, check-in, then it follows the show), `/vote` (the audience), `/api/now` (a
-  Netlify function, cached 2 s at the edge, that every audience phone polls), `shows/<night>/roster.json` and 300 px
+  Netlify function, cached 2 s at the edge, that every audience phone polled; since Phase 5 only their fallback), `shows/<night>/roster.json` and 300 px
   cast photos.
 - `web/deploy.ps1` builds, refuses anything that still mentions production, and deploys.
 - The database: `web/sql/01..05` (migrations ve_01 to ve_07 in the Vessels Events project). Cast codes are stored as
@@ -542,3 +542,53 @@ carrying the show's controls first and the music second; the sound goes out of t
 checks: the tracks, a crossfade, Duck, the volume, a stinger, the setup sheet and its test mode, Fade),
 `npm run check:night` (a track between the games fades as the race goes up, none starts over it, Duck takes the
 race's own sound down and back up, the Vessels TV has its setter).
+
+---
+
+## Phase 5: what's built (2026-10-26)
+
+The load test, at 500 audience phones (Josh: 500, not the 100 first planned). `npm run load` (`tools/load-test.mjs`)
+plays a full room against the real stack on a throwaway show (`load-test`, deleted after): 500 phones doing exactly
+what /vote does, the 12 cast phones checked in with their heartbeat and a live Realtime connection each, the host's
+phone polling, and a stand-in for the launcher opening each vote, polling the tally once a second and closing it on
+its clock. Round 1 has the room vote over 6 s (3 suspects); round 2 over 2 s (all 12), the worst case. Some phones tap
+twice (the second must be refused), some vote after the close (refused), a few never vote. It checks the database's
+tally equals the ballots accepted, choice by choice, and reports latency, errors, and how fast the room saw the vote
+open and close. A JSON report lands in `reports/` (not committed).
+
+### What it found
+1. **Netlify cut off the address.** The first run used the original design: every phone polling the site's cached
+   `/api/now`. Partway in, Netlify's built-in protection stopped answering this laptop's address for the event site
+   (timeouts, not 429s; netlify.com itself still loaded) for about 7 minutes. At a venue every phone on the house
+   Wi-Fi shares one address, so the same cut-off would take /vote, /cast and /host down mid-show. Netlify doesn't
+   publish the threshold; configurable per-address limits are an Enterprise feature.
+2. **Netlify's shared (durable) cache is bypassed** for the function ("Netlify Durable"; fwd=bypass) with every header
+   variant tried (draft deploys, 2026-10-26), so each edge node (about 9 here) runs the function itself: about 4.5
+   database reads a second, not one per 2 s. Not documented; not the invalid Netlify-Vary cause found on Netlify's
+   forum.
+3. **The database takes the room.** Phones polling the database directly (what /vote already did as its fallback):
+   two of three 500-phone runs passed everything (polls p95 71 to 75 ms at 140 to 170 a second, zero errors; votes p95
+   70 to 92 ms, up to 170 votes a second; every phone saw a vote within its poll interval). One run, right after
+   several heavy runs and a live check, hit server-side stalls: the gateway logs show the database layer at p95 8.7 s
+   for about a minute, then recovering. No errors, no restarts in the database's logs; the free plan's small shared
+   server is the suspect (its CPU graph is in Supabase's dashboard, Reports, Database). In every run, every vote was
+   counted exactly once, every repeat and late vote refused.
+4. The cast phones (pings, Realtime) and the host's phone never failed in any run. The audience's reads are cheap
+   (`ev_now` 0.4 ms in the database); Realtime's change-log reader is the database's biggest steady cost.
+
+### What changed
+- **/vote polls the database first** (Josh, 2026-10-26): every 2.5 to 3 s while a vote is open or its result is on
+  its way, every 5 to 6 s between votes (halves the traffic). Two misses in a row: the site's `/api/now` for 30 s,
+  then the database again. The page loads from Netlify once per phone.
+- **`/api/now`** (the fallback): `max-age=2, stale-while-revalidate=4` (max-age halved the function's runs against
+  s-maxage in the header test) and an `X-Ev-Run` id per run so the test can count them.
+- `npm run load` (`--cache` runs the old way round: don't, on a show day; it gets this laptop cut off for minutes).
+
+### The database's traffic
+About 1.3 KB a poll. A 2.5-hour night at 500 phones is roughly 1 to 1.5 GB (mostly between votes, at the slower
+pace). Supabase's free plan includes 5 GB a month, so about four 500-phone nights; Supabase Pro raises that and gives a
+bigger server, which is also the cure if the stalls in finding 3 show up on a show night.
+
+### Not tested
+500 phones loading the /vote page itself from Netlify at once (once each, about 20 files). It could trip the same
+protection as finding 1; testing it risks cutting this laptop off again for several minutes.

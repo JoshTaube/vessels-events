@@ -44,8 +44,12 @@
 </head>
 <body>
 <!-- Vessels Events: the audience's whole night. No login, no live connection: this page reads one small "current
-     vote" record (cached ~2 s by the site) every couple of seconds, and a vote is one plain request. One vote per
-     phone per round. Faces and names are static files loaded once; the ballot itself carries cast ids only.
+     vote" record from the event database every 2.5 to 3 s while a vote is open (every 5 to 6 s between votes), and a
+     vote is one plain request. One vote per phone per round. Faces and names are static files loaded once; the ballot
+     itself carries cast ids only.
+     Why the database and not the site's cached /api/now (load test, 2026-10-26): at 500 phones from one address (a
+     venue's Wi-Fi is one address) Netlify's own protection cut the address off for about 7 minutes; the database took
+     the same 500 with no errors. /api/now is kept as the fallback.
      Vessels votes wear the Vessels look (Direction 2B); Lesser Evil votes wear Lesser Evil's red, white and blue. -->
 <div class="bar"><div class="t" id="barT">VESSELS</div><div class="s" id="barS">The audience decides</div></div>
 <main>
@@ -95,7 +99,7 @@
   const $ = (id) => document.getElementById(id);
   const qs = new URLSearchParams(location.search);
   const SHOW = (qs.get('s') || (window.VL_CONFIG && VL_CONFIG.show) || '').toLowerCase();
-  const POLL_MS = 2500, MAX_HOLD = 15000;
+  const POLL_MS = 2500, IDLE_MS = 5000, MAX_HOLD = 15000;   // a vote open (or its result on its way); between votes
   const VIEWS = ['vWait', 'vBallot', 'vDone', 'vResult', 'vDownload'];
   const view = (v) => VIEWS.forEach((x) => $(x).classList.toggle('hidden', x !== v));
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -123,19 +127,28 @@
     }).catch(() => {});
   }
 
-  // the server's clock: every answer carries it (plus the cache's Age), so reveal times don't trust this phone's
+  // the server's clock: every answer carries it (plus the cache's Age on /api/now), so reveal times don't trust
+  // this phone's
   let offset = 0;
   const serverNow = () => Date.now() + offset;
 
-  let last = null, pick = null, misses = 0;
+  // The database first. Two misses in a row: the site's cached /api/now for 30 s, then the database again.
+  let last = null, pick = null, dbMisses = 0, cacheUntil = 0;
   function poll() {
-    const viaCache = misses < 2;
-    const req = viaCache
-      ? fetch('/api/now?s=' + encodeURIComponent(SHOW)).then((r) => { if (!r.ok) throw new Error(r.status);
-          const age = +(r.headers.get('age') || 0); return r.json().then((j) => { j._age = age; return j; }); })
-      : EV.rpc('ev_now', { p_show: SHOW });
-    req.then((d) => { misses = 0; if (d && d.now) offset = d.now + (d._age || 0) * 1000 - Date.now(); render(d); },
-             () => { misses++; }).then(() => setTimeout(poll, POLL_MS + Math.random() * 500));
+    const viaDb = Date.now() >= cacheUntil;
+    const req = viaDb
+      ? EV.rpc('ev_now', { p_show: SHOW })
+      : fetch('/api/now?s=' + encodeURIComponent(SHOW)).then((r) => { if (!r.ok) throw new Error(r.status);
+          const age = +(r.headers.get('age') || 0); return r.json().then((j) => { j._age = age; return j; }); });
+    req.then((d) => { if (viaDb) dbMisses = 0; if (d && d.now) offset = d.now + (d._age || 0) * 1000 - Date.now(); render(d); },
+             () => { if (viaDb && ++dbMisses >= 2) { dbMisses = 0; cacheUntil = Date.now() + 30000; } })
+      .then(() => setTimeout(poll, pace(last)));
+  }
+  // quick while a vote is open or its result is on its way; slower between votes (the database's traffic halves)
+  function pace(d) {
+    const v = d && d.vote;
+    const busy = v && (v.state === 'open' || (v.reveal_at && v.reveal_at > serverNow()));
+    return (busy ? POLL_MS : IDLE_MS) + Math.random() * (busy ? 500 : 1000);
   }
 
   function theme(game) {

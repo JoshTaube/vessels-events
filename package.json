@@ -11,7 +11,8 @@
     "smoke": "node tools/smoke.mjs",
     "check:phones": "node tools/phones-check.mjs",
     "check:night": "node tools/launcher-check.mjs",
-    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File web/deploy.ps1 -Show shows/sample-show/show.json"
+    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File web/deploy.ps1 -Show shows/sample-show/show.json",
+    "load": "node tools/load-test.mjs"
   },
   "author": "Dojo Disco LLC",
   "license": "UNLICENSED",

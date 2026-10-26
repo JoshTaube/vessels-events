@@ -3,3 +3,4 @@ screenshots/
 config/*.local.json
 web/_site/
 web/_functions/
+reports/

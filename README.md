@@ -4,9 +4,10 @@ The desktop show launcher for live Vessels nights (Dojo Disco). The operator run
 laptop screen, the audience display full screen on the projector. The plan for every phase is in
 [docs/launcher-plan.md](docs/launcher-plan.md).
 
-**Status: Phase 4** (the music and the Stream Deck), on top of Phase 3 (the host's phone), Phase 2 with the Director
-(the games, played by the launcher; the cast phones; the audience vote) and Phase 1 (two windows, projector detection,
-show files, the cue engine with GO, loops, locks and safety cues). The load test comes in Phase 5.
+**Status: Phase 5** (the load test: 500 audience phones), on top of Phase 4 (the music and the Stream Deck), Phase 3
+(the host's phone), Phase 2 with the Director (the games, played by the launcher; the cast phones; the audience vote)
+and Phase 1 (two windows, projector detection, show files, the cue engine with GO, loops, locks and safety cues). What
+the load test found is in the plan, "Phase 5: what's built".
 
 What Phase 2 does:
 - **The games run in the projector window.** The launcher hosts Lesser Evil and Vessels (the event build of
@@ -131,6 +132,7 @@ npm test                 # unit tests (cue engine, show file, night, web server,
 npm run smoke            # the real app, offline: drives the console, checks the projector, restarts it
 npm run check:phones     # the live site: /cast check-in, follow into a room, /vote
 npm run check:night      # the whole night online: the real launcher, the event database, phones on the live site
+npm run load             # 500 audience phones, 12 cast phones and the host against the real stack (a throwaway show)
 ```
 
 The tests launch the app with `--mute`: the music and the games play, silently.
@@ -168,7 +170,7 @@ Defaults are in `main/director.js`.
 - `renderer/`: the console, the audience display, the hidden music player (`audio/`), the shared Vessels look and
   screens, bundled fonts and logos
 - `web/`: the event site build (`build-event.js` generates it from production, `event-patches.js` are the anchored
-  patches, `site/` the event-only pages /cast, /vote and /host, `functions/` the cached current-vote function, `sql/` the
+  patches, `site/` the event-only pages /cast, /vote and /host, `functions/` the cached current-vote function (the audience's fallback), `sql/` the
   event database, in order)
 - `shows/`: show files
 - `tools/`: the smoke test, the live checks, `ev-cli.mjs` (the event database from the command line)
