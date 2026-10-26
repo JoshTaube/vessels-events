@@ -226,6 +226,12 @@ by itself once it's ready and has been up for its time:
 touching the game (the launcher keeps a picture of each screen as it plays). Back again goes further back; Space or
 Esc returns to the live game. The console marks the projector REPLAY while it's up.
 
+**Test bots for Lesser Evil** (Josh, 2026-10-26; built): production's Lesser Evil has no bots. In the Director
+they're easy, because a racer never has to act (GO picks a position, the launcher runs every clock, settles a throw
+or the kingmaker), so **Add a bot** on the race lobby seats a players row the way a joining phone does (`le: {role:
+'run', voter: false, slogan}`, `is_bot`), named "Bot Basil", "Bot Juniper"... Lobby only, up to 12. If a bot wins
+there's no prize (the console says so) and Vessels deals at random.
+
 **Votes in the flow.** Core Vessels' audience vote becomes a screen in the game (from the discussion, GO opens it
 with the suspects picked on the console; the launcher's vote screen covers the game while it's open, since the
 game's own vote screen is the room's checklist). Lesser Evil's stay as they are (the game's ballot board and the

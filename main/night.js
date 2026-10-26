@@ -61,7 +61,7 @@ function leStep(game, players, voteOpen) {
     const waiting = racers.length < 3 ? `needs ${3 - racers.length} more` : unsure ? `${unsure} still choosing` : noSlogan ? `waiting for ${noSlogan} slogan${noSlogan === 1 ? '' : 's'}` : 'ready';
     return { where: `Lobby: ${racers.length} seated · ${waiting}`, action: 'start', label: 'Start the race',
       hint: waiting === 'ready' ? '' : 'It starts once everyone is in and every candidate has typed a slogan on their phone.',
-      extra: [{ action: 'skipIntro', label: 'Start, skip the intro' }] };
+      extra: (racers.length < 12 ? [{ action: 'addbot', label: 'Add a bot' }] : []).concat([{ action: 'skipIntro', label: 'Start, skip the intro' }]) };
   }
   if (le.phase === 'results' || le.phase === 'complete') return { where: 'The race is over: results on screen', action: 'next', label: 'Next' };
   const st = le.stage;
@@ -82,6 +82,11 @@ function dealFor(n) {
   if (n >= 12) out.push('hunter');
   return out.concat('townsfolk');
 }
+
+// Lesser Evil's test bots: their names (each "Bot ..."), and the slogans they run on
+const BOT_NAMES = ['Basil', 'Juniper', 'Rook', 'Mabel', 'Thistle', 'Ozzie', 'Wren', 'Pip', 'Clove', 'Marlow', 'Fig', 'Sable'];
+const BOT_SLOGANS = ['A vote for me is a vote for nothing', 'Lower expectations, higher hopes', 'I was told there would be snacks',
+  'Ask me again after lunch', 'Probably fine', 'I have a plan, somewhere', 'Fewer promises, more naps', 'Mostly harmless'];
 
 // what each Lesser Evil step runs inside its TV
 const LE_ACTIONS = { start: 'leIntroStart', skipIntro: 'leIntroSkip', next: 'leNext', startTimer: 'leStartSpeech', skip: 'leSkip' };
@@ -256,8 +261,13 @@ function make(o) {
     const p = (players || []).find((x) => String(x.id) === String(le.winner));
     const nm = p ? p.name : (le.players && le.players[le.winner] && le.players[le.winner].name);
     const c = show.cast.find((x) => norm(x.name) === norm(nm));
-    if (!c || (saved.leWinner && saved.leWinner.cast_id === c.id)) return;
-    saved.leWinner = { cast_id: c.id, name: c.name }; saved.prizeRoles = null; persist();
+    if (!c) {
+      // a test bot (or anyone not in the cast) won: there's nobody to give the prize to
+      if (nm && saved.leWinnerOther !== nm) { saved.leWinnerOther = nm; persist(); log(`Lesser Evil winner: ${nm} (not in the cast: no prize)`); changed(); }
+      return;
+    }
+    if (saved.leWinner && saved.leWinner.cast_id === c.id) return;
+    saved.leWinner = { cast_id: c.id, name: c.name }; saved.prizeRoles = null; saved.leWinnerOther = null; persist();
     log(`Lesser Evil winner: ${c.name}`);
     changed();
   }
@@ -433,6 +443,22 @@ function make(o) {
     const s = VLE.hostStep(live.games.cv, live.players.cv);
     return Object.assign({}, s, { extra: s.extra || [] });
   }
+  // A TEST BOT in the Lesser Evil lobby (Josh, 2026-10-26: to try a race without three phones). Seated like a phone
+  // that has chosen to run and typed a slogan; it never has to act, because every move a racer makes has a GO
+  // fallback (a random position, the launcher's clocks, a settled throw). The race caps at 12.
+  async function addLeBot() {
+    const room = saved.rooms.le, g = live.games.le;
+    if (g && g.le) return { error: 'The race has started: bots join in the lobby' };
+    const ps = live.players.le || [], racers = ps.filter((p) => !(p.le && p.le.isHost));
+    if (racers.length >= 12) return { error: 'The race is full (12)' };
+    const taken = new Set(ps.map((p) => norm(p.name)).concat(show.cast.map((c) => norm(c.name))));
+    const name = BOT_NAMES.map((n) => 'Bot ' + n).find((n) => !taken.has(norm(n))) || `Bot ${racers.length + 1}`;
+    const slogan = BOT_SLOGANS[(racers.length + ps.length) % BOT_SLOGANS.length];
+    const r = await run('le-bot', () => db.addLeBot(room, name, slogan));
+    if (!r) return { error: 'Couldn’t seat a bot: ' + (live.db.err || 'try again') };
+    live.players.le = ps.concat(r); changed();
+    return { ok: true, flash: `${name} joins the race` };
+  }
   // N on the console (action omitted: whatever the game is waiting for), or one of the step's extra buttons
   async function engineStep(g, action) {
     if (!show || !db) return { error: 'Offline: the games need the event database' };
@@ -443,6 +469,7 @@ function make(o) {
     if (s.pending && g === 'cv') return { error: `Waiting for the screen to take “${s.pending}”` };
     if (g === 'cv' && a === 'start') { const h = prizeHold(); if (h) return { error: h }; }
     if (a === 'close-vote') return closeVote('operator');
+    if (g === 'le' && a === 'addbot') return addLeBot();
     if (g === 'le') {
       const fn = LE_ACTIONS[a];
       if (!fn) return { error: 'Unknown Lesser Evil step ' + a };
@@ -624,6 +651,7 @@ function make(o) {
       prize: saved.leWinner ? { name: saved.leWinner.name, cast_id: saved.leWinner.cast_id, roles: saved.prizeRoles || [],
         pick: (live.prize && live.prize.cast_id === saved.leWinner.cast_id && live.prize.pick) || null,
         sent: !!saved.pickSent, used: !!saved.pickUsed } : null,
+      prizeNobody: !saved.leWinner && saved.leWinnerOther ? saved.leWinnerOther : null,   // a bot won the race
     });
   }
 

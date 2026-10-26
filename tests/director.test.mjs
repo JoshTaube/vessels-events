@@ -81,7 +81,8 @@ function setup() {
   const db = { registerShow: () => rec('reg', null, { ok: true }), control: (room, row) => rec('control', Object.assign({ room }, row), [{}]),
     game: (r) => rec('game', r, () => games[r] || null), players: (r) => rec('players', r, () => players[r] || []), castStatus: () => rec('cast', null, { cast: [] }),
     setShow: (id, p) => rec('setShow', p, { ok: true }), captain: (room, a) => rec('captain', { room, a }, null), leBallot: () => rec('leBallot', null, null),
-    openVote: (id, v) => rec('openVote', v, { ok: true, id: 7 }), tally: () => rec('tally', null, { counts: {}, total: 0 }), setPrize: () => rec('setPrize', null, { ok: true }) };
+    openVote: (id, v) => rec('openVote', v, { ok: true, id: 7 }), tally: () => rec('tally', null, { counts: {}, total: 0 }), setPrize: () => rec('setPrize', null, { ok: true }),
+    addLeBot: (room, name, slogan) => rec('addLeBot', { room, name, slogan }, () => { const p = { id: 'b' + (players[room] || []).length, name, is_bot: true, le: { role: 'run', voter: false, slogan } }; players[room] = (players[room] || []).concat(p); return p; }) };
   const store = { read: (k, f) => (k in m ? JSON.parse(m[k]) : f), write: (k, v) => { m[k] = JSON.stringify(v); } };
   let state = Engine.initial(SHOW, Date.now());
   const n = Night.make({ db, EV, store, manual: true, act: () => {}, onChange: () => {}, runInEngine: () => Promise.resolve('ok') });
@@ -146,4 +147,27 @@ test('Core Vessels’ vote from the Director: GO at the discussion opens it on t
   const v = t.calls.filter((c) => c[0] === 'openVote').pop()[1];
   assert.deepEqual(v.candidates, ['ava', 'cleo']); assert.equal(v.auto, true); assert.equal(v.secs, 30);
   assert.equal(t.n.engines(t.n._state ? null : { started: true }, t.at('505'), 'http://x')[0].visible, false, 'the vote screen covers the game');
+});
+
+test('test bots in the Lesser Evil lobby: seated ready to run, distinct names, lobby only; a bot winning has no prize', async () => {
+  const t = setup();
+  await t.n._tick(); await t.n._tick();
+  const room = t.n._saved().rooms.le;
+  t.games[room] = { id: room, phase: 'le', le: null };
+  await t.n._tick();
+  const lobby = D.lesserEvil(t.games[room], [], null);
+  assert.ok(lobby.extra.some((e) => e.action === 'addbot' && e.label === 'Add a bot'), 'the lobby offers it');
+  for (let k = 0; k < 3; k++) assert.equal((await t.n.engineStep('le', 'addbot')).ok, true);
+  const bots = t.calls.filter((c) => c[0] === 'addLeBot').map((c) => c[1]);
+  assert.deepEqual(bots.map((b) => b.name), ['Bot Basil', 'Bot Juniper', 'Bot Rook']);
+  assert.ok(bots.every((b) => b.room === room && b.slogan), 'each with a slogan, in the race room');
+  const ready = D.lesserEvil(t.games[room], t.players[room], null);
+  assert.equal(ready.ready, true, 'three bots make a race that can start'); assert.match(ready.detail, /3 bots/);
+  t.games[room] = { id: room, phase: 'le', le: { phase: 'race', stage: null } };
+  await t.n._tick();
+  assert.match((await t.n.engineStep('le', 'addbot')).error, /bots join in the lobby/);
+  t.games[room] = { id: room, phase: 'le', le: { phase: 'results', winner: 'b1' } };
+  await t.n._tick();
+  const snap = t.n.snapshot(null, t.at('505'), true);
+  assert.equal(snap.prize, null); assert.equal(snap.prizeNobody, 'Bot Juniper', 'the console says a bot won: no prize');
 });

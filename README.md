@@ -80,7 +80,9 @@ and the saved show somewhere else, `--offline` never touches the event database.
 3. GO through the welcome to **230 Practice vote**. On another phone scan the QR (or open /vote): vote. The console
    counts it. GO on closes it and shows the result.
 4. GO to **301 Lesser Evil**. The cast phones jump into the race. Each types a campaign slogan; the game panel says
-   *Ready*. GO to **310 The race**: the race's lobby is on the projector.
+   *Ready*. GO to **310 The race**: the race's lobby is on the projector. Short of phones? **Add a bot** on the game
+   panel seats a test racer ("Bot Basil"...) with a slogan; three bots make a race on their own. A bot never has to
+   do anything (GO picks its position, runs its clocks), and if a bot wins there's no prize.
 5. Keep pressing **Space**: it plays the intro (Space again skips it), shows the line-ups, starts each debate, each
    speaker's clock, ends each speech. Nothing moves until you press it (a speech whose clock runs out waits, Ready).
    When a ballot opens, the projector shows the game's ballot (the positions) with the vote QR beside it, and every

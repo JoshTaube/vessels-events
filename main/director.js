@@ -49,9 +49,11 @@ function lesserEvil(game, players, vote, opts) {
     const unsure = racers.filter((p) => !(p.le && p.le.role)).length;
     const noSlogan = racers.filter((p) => !(p.le && p.le.voter) && !String((p.le && p.le.slogan) || '').trim()).length;
     const why = racers.length < 3 ? `Needs ${3 - racers.length} more in the race` : unsure ? `${unsure} still choosing` : noSlogan ? `Waiting for ${plural(noSlogan, 'slogan')}` : '';
-    return S({ key: 'le:lobby', title: `Lobby: ${racers.length} in the race`, ready: !why, why,
+    const bots = racers.filter((p) => p.is_bot).length;
+    return S({ key: 'le:lobby', title: `Lobby: ${racers.length} in the race`, detail: bots ? `${plural(bots, 'bot')} among them` : '', ready: !why, why,
       go: { action: 'start', label: 'Play the intro and start the race' }, blocked: why || null, manual: true,
-      extra: why ? [] : [{ action: 'skipIntro', label: 'Start, skip the intro' }] });
+      // a test bot (night.js addLeBot): seated ready to run, it never has to act
+      extra: (racers.length < 12 ? [{ action: 'addbot', label: 'Add a bot' }] : []).concat(why ? [] : [{ action: 'skipIntro', label: 'Start, skip the intro' }]) });
   }
   const g = le.game_no || 0, idx = le.stage_idx || 0, base = `le:${g}:${idx}`;
   if (le.phase === 'results' || le.phase === 'complete') {

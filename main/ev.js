@@ -50,6 +50,10 @@ function make(cfg, opts) {
     tally: (voteId) => rpc('ev_tally', { p_key: K, p_vote: voteId }),
     closeVote: (voteId, revealMs) => rpc('ev_close_vote', { p_key: K, p_vote: voteId, p_reveal_ms: revealMs == null ? 4000 : revealMs }),
     dropShow: (showId) => rpc('ev_drop_show', { p_key: K, p_show: showId }),
+    // a test bot in a Lesser Evil race: seated the way a joining phone seats itself (a racer with a slogan). It never
+    // has to act: every move a racer makes has a GO fallback in the Director (a random pick, a host-run clock...)
+    addLeBot: (room, name, slogan) => call('/rest/v1/players', { method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ game_id: room, name, is_bot: true, le: { voter: false, role: 'run', slogan } }) }).then((r) => (r && r[0]) || null),
     // the Lesser Evil winner's prize: {cast_id, name, roles, pick?} (pick: the operator picks for them), or null
     setPrize: (showId, prize) => rpc('ev_set_prize', { p_key: K, p_show: showId, p_prize: prize }),
     // event_control (open to anon, Vessels Live's trust model): one row per room

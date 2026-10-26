@@ -266,7 +266,12 @@
     // the Lesser Evil winner's prize: their own pick of Vessels role. Theirs to make on their phone; the operator can
     // pick for them (a dead phone). Private: the room never sees it.
     const z = L.prize, ROLE = { 'host-demon': 'Demon', priest: 'Priest', nun: 'Nun', anointed: 'Anointed', sage: 'Scholar', hunter: 'Vanquisher', townsfolk: 'Townsfolk' };
-    $('prize').classList.toggle('hidden', !z);
+    $('prize').classList.toggle('hidden', !z && !L.prizeNobody);
+    if (!z && L.prizeNobody) {   // a test bot won the race: nobody to give the prize to
+      $('prize').classList.remove('done');
+      $('prizeT').innerHTML = `<b>${esc(L.prizeNobody)}</b> won Lesser Evil · not in the cast, so no prize: Vessels deals at random`;
+      if ($('prizeChips')._html !== '') { $('prizeChips').innerHTML = ''; $('prizeChips')._html = ''; }
+    }
     if (z) {
       const pick = z.pick && z.pick.role;
       $('prize').classList.toggle('done', !!pick);
