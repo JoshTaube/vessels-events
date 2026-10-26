@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src 'self' file: data:; media-src 'self' file:; font-src 'self' file:; style-src 'self' 'unsafe-inline' file:; script-src 'self' file:; frame-src http://127.0.0.1:*">
+<title>Vessels: audience display</title>
+<link rel="stylesheet" href="../shared/vessels.css">
+<link rel="stylesheet" href="../shared/screens.css">
+<style>
+  html, body { background: #000; overflow: hidden; cursor: none; }
+  body.preview { cursor: default; }
+  #wrap { position: fixed; inset: 0; z-index: 2; }
+  /* the game TVs: full window under the stage, hidden until a game cue uncovers one */
+  #engines { position: fixed; inset: 0; z-index: 1; background: #000; }
+  #engines iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; visibility: hidden; }
+  #engines iframe.on { visibility: visible; }
+  /* a game is up: the stage goes see-through except what sits on top of the game (safety cards, the corner QR) */
+  body.gameon #wrap .stage { background: transparent; }
+  body.gameon #wrap .stage .layer.show { display: none; }
+  /* no projector: a label so nobody mistakes the preview window for the real thing */
+  #pv { position: fixed; right: 12px; bottom: 10px; z-index: 50; font: 600 11px/1 var(--ui); letter-spacing: .3em; text-transform: uppercase; color: var(--lav);
+    background: rgba(0,0,0,.7); padding: 7px 10px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--violet); }
+</style>
+</head>
+<body>
+<div id="engines"></div>
+<div id="wrap"><div class="stage" id="stage"></div></div>
+<div id="pv" class="hidden">Preview · no projector</div>
+<script src="../shared/screens.js"></script>
+<script src="display.js"></script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src 'self' file: data:; media-src 'self' file:; font-src 'self' file:; style-src 'self' 'unsafe-inline' file:; script-src 'self' file:">
+<title>Vessels Events</title>
+<link rel="stylesheet" href="../shared/vessels.css">
+<link rel="stylesheet" href="../shared/screens.css">
+<link rel="stylesheet" href="console.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><div class="wm" id="wm"></div><div class="showname"><b id="showName">No show loaded</b><span id="showMeta"></span></div></div>
+  <nav class="rail" id="rail"></nav>
+  <div class="tools">
+    <label class="proj"><span class="lbl">Projector</span><select id="projSel" aria-label="Projector"></select></label>
+    <div class="clock"><b id="clock">--:--</b><span id="runtime"></span></div>
+    <div class="menu"><button class="tbtn" id="menuBtn" aria-haspopup="true">Show ▾</button>
+      <div class="pop hidden" id="menuPop"><button id="mOpen">Open show file…</button><button id="mReload">Reload show file</button><button id="mReset" class="warn">Start the show over…</button></div></div>
+  </div>
+</header>
+
+<div id="problems" class="problems hidden"></div>
+
+<main id="board" class="hidden">
+  <section class="colA">
+    <div class="card now">
+      <div class="lbl">Now</div>
+      <div class="cuehead"><span class="qid" id="nowId">·</span><div><div class="qtitle" id="nowTitle">Standing by</div><div class="qmeta" id="nowMeta">Press GO to start the show</div></div></div>
+      <div class="say" id="nowSay"><div class="lbl lav">Host says</div><div class="line" id="nowLine"></div></div>
+      <div class="timerbox hidden" id="timerBox"><span class="lbl">Timer</span><b id="timerTxt" data-timer>0:00</b><button class="tbtn sm" id="extendBtn">+30 s (5)</button></div>
+    </div>
+
+    <div class="card next" id="nextCard">
+      <div class="lbl">Next on GO</div>
+      <div class="cuehead"><span class="qid" id="nextId">·</span><div><div class="qtitle" id="nextTitle"></div><div class="qmeta" id="nextMeta"></div></div></div>
+      <div class="lock hidden" id="nextLock"></div>
+    </div>
+
+    <div class="branch hidden" id="branch">
+      <div class="lbl lav">This cue loops</div>
+      <div class="ways"><button class="way" id="wayLoop"><b></b><span></span><kbd>R</kbd></button><button class="way" id="wayExit"><b></b><span></span><kbd>E</kbd></button></div>
+    </div>
+
+    <button class="go" id="goBtn"><span class="gotxt">GO</span><kbd>Space</kbd></button>
+    <div class="status" id="status" aria-live="polite"></div>
+    <div class="backrow"><button class="tbtn sm" id="backBtn">← Back one cue <kbd>Shift+⌫</kbd></button></div>
+    <div class="card hostmirror">
+      <div class="lbl">Host view <span class="quiet">mirror</span></div>
+      <div class="phone"><div class="hv-cue" id="hvCue"></div><div class="hv-line" id="hvLine"></div><div class="hv-next" id="hvNext"></div><div class="hv-timer" id="hvTimer" data-timer></div></div>
+    </div>
+  </section>
+
+  <section class="colB">
+    <div class="pvwrap"><div class="pvhead"><span class="lbl">On the projector</span><span class="aud" id="audUrl"></span><button class="tbtn sm" id="qrBtn">Corner QR · on <kbd>Q</kbd></button></div><div class="pvbox" id="pvbox"><div class="stage" id="pvstage"></div><img id="pvthumb" class="hidden" alt=""></div><div class="pvnote" id="pvnote"></div></div>
+    <div class="cuelist"><div class="lbl listhead">Cue list <span>double-click a cue to jump</span></div><ol id="cues"></ol></div>
+  </section>
+
+  <section class="colC">
+    <div class="card game" id="gameCard">
+      <div class="lbl"><span id="gName">The game</span> <span class="quiet" id="gRoom"></span><span class="net" id="gNet"></span></div>
+      <div class="gwhere" id="gWhere">Offline</div>
+      <div class="ghint" id="gHint"></div>
+      <button class="gstep" id="gStep" disabled><b id="gStepTxt">Nothing to press</b><kbd>N</kbd></button>
+      <div class="gextra" id="gExtra"></div>
+      <div class="noms hidden" id="noms"><div class="ptitle">Suspects for the vote <span id="nomCount"></span></div><div class="chips" id="nomChips"></div></div>
+      <div class="vbox hidden" id="vbox">
+        <div class="vhead"><b id="vTitle"></b><span id="vLeft"></span></div>
+        <div class="vrows" id="vRows"></div>
+        <div class="vfoot"><span id="vTotal"></span><button class="tbtn sm" id="vExtend">+30 s <kbd>5</kbd></button><button class="tbtn sm" id="vClose">Close vote <kbd>V</kbd></button></div>
+      </div>
+      <div class="prize hidden" id="prize"><div class="ptitle" id="prizeT"></div><div class="chips" id="prizeChips"></div></div>
+      <div class="mvpbox hidden" id="mvpbox"><div class="ptitle">MVP so far <span class="quiet">private until the finale</span></div><div id="mvpTxt"></div></div>
+    </div>
+    <div class="card safety">
+      <div class="lbl">Safety cues <span class="quiet">never move the show</span></div>
+      <div class="pad" id="pad"></div>
+      <div class="picker hidden" id="picker"><div class="ptitle" id="pickTitle"></div><div class="chips" id="pickChips"></div></div>
+    </div>
+    <div class="card checkin">
+      <div class="lbl">Cast check-in <span class="quiet" id="ciCount"></span></div>
+      <div class="seats" id="seats"></div>
+      <div class="hint">A seat lights when its phone enters the cast code (a dim ring: the phone has gone quiet). Click a seat to mark it by hand, for a dead phone.</div>
+    </div>
+  </section>
+</main>
+
+<section id="empty" class="empty hidden">
+  <div class="emptycard">
+    <div class="wm big" id="wmBig"></div>
+    <h1>Load tonight’s show</h1>
+    <p>Pick the show file: the cast, their codes, the cue list, the prompts and the music.</p>
+    <button class="primary" id="openBtn">Open show file…</button>
+    <div class="errs hidden" id="loadErrs"></div>
+  </div>
+</section>
+
+<div class="keys"><span><kbd>Space</kbd> GO</span><span><kbd>1</kbd>–<kbd>6</kbd> safety</span><span><kbd>Esc</kbd> clear</span><span><kbd>R</kbd>/<kbd>E</kbd> loop or move on</span><span><kbd>N</kbd> game step</span><span><kbd>V</kbd> close vote</span><span><kbd>Q</kbd> corner QR</span><span><kbd>Shift</kbd>+<kbd>⌫</kbd> back</span></div>
+<div class="toast hidden" id="toast"></div>
+
+<script src="../shared/screens.js"></script>
+<script src="console.js"></script>
+</body>
+</html>

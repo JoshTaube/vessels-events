@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#04040a">
+<title>Vessels · Vote</title>
+<link rel="stylesheet" href="ev.css">
+<script src="event-config.js"></script>
+<script src="ev.js"></script>
+<style>
+  .prompt { font-family: var(--cinzel); font-weight: 600; font-size: clamp(26px, 8vw, 34px); line-height: 1.12; letter-spacing: .03em; }
+  .badge { display: inline-block; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--lav); box-shadow: inset 0 0 0 1px rgba(176,123,255,.5); }
+  body.le .badge { color: var(--le-cream); box-shadow: inset 0 0 0 1px rgba(245,241,232,.4); font-family: var(--oswald); }
+  .faces { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 14px; width: 100%; max-width: 420px; margin: 8px auto 0; }
+  .face { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 6px 12px; border-radius: 20px; background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line); transition: transform .08s, box-shadow .15s, background .15s; }
+  .face .coin { width: 86px; height: 86px; }
+  .face .nm { font-family: var(--cinzel); font-weight: 700; font-size: 17px; letter-spacing: .06em; }
+  .face.on { background: rgba(176,123,255,.14); box-shadow: inset 0 0 0 2px var(--violet), 0 0 30px rgba(176,123,255,.25); transform: scale(1.03); }
+  body.le .face.on { background: rgba(245,241,232,.08); box-shadow: inset 0 0 0 2px var(--le-cream); }
+  .faces.sides { grid-template-columns: 1fr; }
+  .face.side { min-height: 96px; justify-content: center; padding: 18px 16px; }
+  .face.side .nm { font-size: 18px; line-height: 1.3; letter-spacing: .02em; text-align: center; }
+  body.le .face .nm { font-family: var(--oswald); letter-spacing: .04em; }
+  .timebar { width: 100%; max-width: 420px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; margin: 0 auto; }
+  .timebar i { display: block; height: 100%; background: linear-gradient(90deg, #7a4aa8, #d4a8f5); transition: width .4s linear; }
+  body.le .timebar i { background: linear-gradient(90deg, #22468c, #b53131); }
+  .act { width: 100%; max-width: 420px; margin: 0 auto; }
+  .big .coin { width: 150px; height: 150px; box-shadow: inset 0 0 0 3px var(--violet), 0 0 50px rgba(176,123,255,.4); }
+  body.le .big .coin { box-shadow: inset 0 0 0 3px var(--le-cream), 0 0 50px rgba(46,92,168,.5); }
+  .winner { font-family: var(--cinzel); font-weight: 600; font-size: clamp(34px, 11vw, 48px); letter-spacing: .05em; }
+  .games { display: grid; gap: 12px; width: 100%; max-width: 420px; }
+  .game { height: 92px; border-radius: 18px; display: grid; place-items: center; background: var(--panel); box-shadow: inset 0 0 0 1px rgba(176,123,255,.45); }
+  .game img { max-height: 46px; max-width: 80%; }
+  .game.le { background: radial-gradient(at 50% -10%, #16294a, #0b1526 70%); box-shadow: inset 0 0 0 1px rgba(245,241,232,.25); }
+  .more { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 6px; }
+  .more img { height: 30px; width: auto; }
+  .stores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 420px; }
+  .stores a { height: 56px; border-radius: 16px; display: grid; place-items: center; text-decoration: none; background: var(--slab); color: var(--ink);
+    font-family: var(--cinzel); font-weight: 700; font-size: 16px; letter-spacing: .08em; }
+</style>
+</head>
+<body>
+<!-- Vessels Events: the audience's whole night. No login, no live connection: this page reads one small "current
+     vote" record (cached ~2 s by the site) every couple of seconds, and a vote is one plain request. One vote per
+     phone per round. Faces and names are static files loaded once; the ballot itself carries cast ids only.
+     Vessels votes wear the Vessels look (Direction 2B); Lesser Evil votes wear Lesser Evil's red, white and blue. -->
+<div class="bar"><div class="t" id="barT">VESSELS</div><div class="s" id="barS">The audience decides</div></div>
+<main>
+  <section class="mid" id="vWait">
+    <div class="wm" id="waitMark"><img src="ev/assets/vessels-wordmark.png" alt="Vessels"></div>
+    <h1 id="waitH">You're the jury</h1>
+    <div class="story" id="waitP">The cast play. You decide. Your vote opens right here.</div>
+    <div class="lbl" style="display:flex;align-items:center;gap:10px;justify-content:center"><span class="pulse"></span><span id="waitS">Waiting for the next vote</span></div>
+  </section>
+
+  <section class="mid hidden" id="vBallot">
+    <span class="badge hidden" id="practice">Practice · it doesn't count</span>
+    <div class="prompt" id="prompt"></div>
+    <div class="timebar hidden" id="tbar"><i id="tfill"></i></div>
+    <div class="faces" id="faces"></div>
+    <div class="act"><button class="slab" id="cast" disabled>TAP A NAME</button><div class="err" id="err"></div></div>
+  </section>
+
+  <section class="mid hidden big" id="vDone">
+    <div class="lbl" id="doneL">Vote in</div>
+    <div id="doneFace"></div>
+    <h1 id="doneH"></h1>
+    <div class="story" id="doneP">Eyes on the stage.</div>
+  </section>
+
+  <section class="mid hidden big" id="vResult">
+    <div class="lbl" id="resL">The audience has spoken</div>
+    <div id="resFace"></div>
+    <div class="winner" id="resH"></div>
+    <div class="story" id="resP"></div>
+  </section>
+
+  <section class="mid hidden" id="vDownload">
+    <div class="lbl">Thank you for playing</div>
+    <h1>Take tonight home</h1>
+    <div class="games">
+      <div class="game le"><img src="ev/assets/lesser_evil_logo.svg" alt="Lesser Evil"></div>
+      <div class="game"><img src="ev/assets/vessels-wordmark.png" alt="Vessels"></div>
+    </div>
+    <div class="more"><span class="lbl">Also on the app</span><img src="ev/assets/sinking_ship_logo.png" alt="Sinking Ship"></div>
+    <div class="stores"><a id="ios" href="https://playvessels.com" rel="noopener">App Store</a><a id="android" href="https://playvessels.com" rel="noopener">Google Play</a></div>
+  </section>
+</main>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const qs = new URLSearchParams(location.search);
+  const SHOW = (qs.get('s') || (window.VL_CONFIG && VL_CONFIG.show) || '').toLowerCase();
+  const POLL_MS = 2500, MAX_HOLD = 15000;
+  const VIEWS = ['vWait', 'vBallot', 'vDone', 'vResult', 'vDownload'];
+  const view = (v) => VIEWS.forEach((x) => $(x).classList.toggle('hidden', x !== v));
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const voted = { get: (id) => { try { return localStorage.getItem('ev_voted:' + id); } catch (e) { return null; } },
+                  set: (id, c) => { try { localStorage.setItem('ev_voted:' + id, c); } catch (e) {} } };
+  const links = (window.VL_CONFIG && VL_CONFIG.storeLinks) || {};
+  if (links.ios) $('ios').href = links.ios;
+  if (links.android) $('android').href = links.android;
+
+  // tonight's faces and names, once, preloaded
+  // labels: the vote's own words for options that aren't people (Lesser Evil's sudden death: FOR or AGAINST)
+  let roster = {}, labels = {};
+  const isSide = (id) => !roster[id] && labels[id] != null;
+  const coin = (id, size) => {
+    if (isSide(id)) return '';
+    const p = roster[id] || { name: id }, s = size || 86;
+    return `<div class="coin" style="width:${s}px;height:${s}px">${p.photo ? `<img src="${esc(p.photo)}" alt="">` : `<span class="ini" style="font-size:${Math.round(s * .42)}px">${esc((p.name || '?')[0])}</span>`}</div>`;
+  };
+  const nameOf = (id) => (labels[id] != null ? labels[id] : (roster[id] && roster[id].name) || id);
+  const voteFor = (id) => (isSide(id) ? 'VOTE ' + String(nameOf(id)).split(':')[0] : 'VOTE FOR ' + nameOf(id)).toUpperCase();
+  function loadRoster() {
+    if (!SHOW) return Promise.resolve();
+    return fetch('/shows/' + encodeURIComponent(SHOW) + '/roster.json').then((r) => r.json()).then((j) => {
+      roster = {}; (j.cast || []).forEach((c) => { roster[c.id] = c; if (c.photo) { const im = new Image(); im.src = c.photo; } });
+    }).catch(() => {});
+  }
+
+  // the server's clock: every answer carries it (plus the cache's Age), so reveal times don't trust this phone's
+  let offset = 0;
+  const serverNow = () => Date.now() + offset;
+
+  let last = null, pick = null, misses = 0;
+  function poll() {
+    const viaCache = misses < 2;
+    const req = viaCache
+      ? fetch('/api/now?s=' + encodeURIComponent(SHOW)).then((r) => { if (!r.ok) throw new Error(r.status);
+          const age = +(r.headers.get('age') || 0); return r.json().then((j) => { j._age = age; return j; }); })
+      : EV.rpc('ev_now', { p_show: SHOW });
+    req.then((d) => { misses = 0; if (d && d.now) offset = d.now + (d._age || 0) * 1000 - Date.now(); render(d); },
+             () => { misses++; }).then(() => setTimeout(poll, POLL_MS + Math.random() * 500));
+  }
+
+  function theme(game) {
+    const le = game === 'le';
+    document.body.classList.toggle('le', le);
+    $('barT').textContent = le ? 'LESSER EVIL' : 'VESSELS';
+  }
+
+  let tick = null;
+  function render(d) {
+    last = d;
+    if (!d || d.ok === false) { view('vWait'); $('waitS').textContent = SHOW ? 'Waiting for the show' : 'Scan the QR on the screen'; return; }
+    const v = d.vote;
+    labels = (v && v.labels) || {};
+    theme(v && v.game);
+    if (d.stage === 'download') { view('vDownload'); $('barS').textContent = 'Good night'; return; }
+    $('barS').textContent = 'The audience decides';
+    if (!v || d.stage === 'waiting') { view('vWait'); return; }
+    if (v.state === 'open') {
+      const mine = voted.get(v.id);
+      if (mine) return showDone(v, mine);
+      return showBallot(v);
+    }
+    // closed: hold the result until reveal_at by the server's clock (never longer than 15 s), then show it
+    const hold = v.reveal_at ? Math.min(Math.max(0, v.reveal_at - serverNow()), MAX_HOLD) : 0;
+    if (hold > 0) {
+      view('vDone'); $('doneL').textContent = 'Voting closed'; $('doneFace').innerHTML = ''; $('doneH').textContent = 'The votes are in';
+      $('doneP').textContent = 'Eyes on the stage.';
+      clearTimeout(tick); tick = setTimeout(() => render(last), hold + 50);
+      return;
+    }
+    showResult(v);
+  }
+
+  let ballotId = null;
+  function showBallot(v) {
+    view('vBallot');
+    if (ballotId !== v.id) {
+      ballotId = v.id; pick = null;
+      $('prompt').textContent = v.prompt || 'Who gets your vote?';
+      $('practice').classList.toggle('hidden', !v.practice);
+      $('faces').classList.toggle('sides', v.candidates.some(isSide));
+      $('faces').innerHTML = v.candidates.map((id) => `<button class="face${isSide(id) ? ' side' : ''}" data-id="${esc(id)}">${coin(id)}<span class="nm">${esc(nameOf(id))}</span></button>`).join('');
+      $('cast').disabled = true; $('cast').textContent = 'TAP A NAME'; $('err').textContent = '';
+    }
+    const left = v.closes_at ? v.closes_at - serverNow() : null;
+    $('tbar').classList.toggle('hidden', left == null);
+    if (left != null) $('tfill').style.width = Math.max(0, Math.min(100, left / 300)) + '%';   // full bar = 30 s
+  }
+  $('faces').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-id]'); if (!b) return;
+    pick = b.dataset.id;
+    $('faces').querySelectorAll('.face').forEach((f) => f.classList.toggle('on', f === b));
+    $('cast').disabled = false; $('cast').textContent = voteFor(pick);
+  });
+  $('cast').addEventListener('click', () => {
+    const v = last && last.vote; if (!v || !pick) return;
+    $('cast').disabled = true; $('err').textContent = '';
+    EV.rpc('ev_vote_cast', { p_vote: v.id, p_device: EV.device(), p_choice: pick }).then((r) => {
+      if (r && (r.ok || r.reason === 'already')) { voted.set(v.id, r.ok ? pick : (voted.get(v.id) || pick)); showDone(v, voted.get(v.id)); return; }
+      if (r && r.reason === 'closed') { $('err').textContent = 'Voting just closed'; return; }
+      $('cast').disabled = false; $('err').textContent = 'That didn’t go through. Try again';
+    }, () => { $('cast').disabled = false; $('err').textContent = 'No connection. Try again'; });
+  });
+
+  function showDone(v, mine) {
+    view('vDone'); $('doneL').textContent = v.practice ? 'Practice vote in' : 'Vote in';
+    $('doneFace').innerHTML = coin(mine, 150); $('doneH').textContent = nameOf(mine); $('doneP').textContent = 'Eyes on the stage.';
+  }
+  function showResult(v) {
+    const r = v.result || {};
+    view('vResult');
+    if (r.tied) { $('resL').textContent = 'Too close to call'; $('resFace').innerHTML = ''; $('resH').textContent = 'It’s a tie'; $('resP').textContent = 'The host has the final word.'; return; }
+    if (!r.winner) { $('resL').textContent = 'Voting closed'; $('resFace').innerHTML = ''; $('resH').textContent = 'No votes'; $('resP').textContent = ''; return; }
+    $('resL').textContent = v.practice ? 'Practice result' : 'The audience has spoken';
+    $('resFace').innerHTML = coin(r.winner, 150); $('resH').textContent = nameOf(r.winner);
+    $('resP').textContent = (r.counts && r.total) ? `${r.counts[r.winner]} of ${r.total} votes` : '';
+  }
+
+  view('vWait');
+  if (!SHOW) { $('waitS').textContent = 'Scan the QR on the screen'; return; }
+  loadRoster().then(poll);
+})();
+</script>
+</body>
+</html>

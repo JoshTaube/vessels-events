@@ -1,0 +1,57 @@
+/* Vessels Events: the look of /cast and /vote, on phones. Vessels is the current production design, Direction 2B
+   (the Classic Player 9.21 screens): near-black #04040A under a purple glow, lavender Cinzel headers, frosted cards,
+   the purple slab for the one action. .le is Lesser Evil's red, white and blue (lesser-evil.css). */
+@import url('ev/fonts/fonts.css');
+:root {
+  --bg: #04040a; --panel: rgba(255,255,255,.035); --panel-2: rgba(255,255,255,.06); --line: rgba(255,255,255,.1); --line-2: rgba(255,255,255,.16);
+  --text: #fff; --text-2: rgba(255,255,255,.72); --text-3: rgba(255,255,255,.45);
+  --lav: #d4a8f5; --lav-2: #b07fe0; --violet: #b07bff; --deep: #7a4aa8; --ink: #17091f;
+  --slab: linear-gradient(#d4a8f5, #b07fe0 45%, #7a4aa8); --demon: #e0524f;
+  --le-navy: #1a2a4a; --le-navy-3: #0b1526; --le-blue: #22468c; --le-red: #b53131; --le-cream: #f5f1e8;
+  --cinzel: 'Cinzel', 'Times New Roman', serif; --garamond: 'EB Garamond', Georgia, serif; --ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --oswald: 'Oswald', 'Arial Narrow', sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; min-height: 100%; }
+body { background: radial-gradient(120% 70% at 50% 8%, rgba(176,127,224,.16), rgba(0,0,0,0) 60%), var(--bg); background-attachment: fixed;
+  color: var(--text); font-family: var(--ui); -webkit-font-smoothing: antialiased; min-height: 100dvh; display: flex; flex-direction: column; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.hidden { display: none !important; }
+
+/* the header bar of the player screens: lavender Cinzel title, a quiet line under it */
+.bar { flex: none; padding: max(18px, env(safe-area-inset-top)) 20px 14px; text-align: center; background: rgba(4,4,10,.9); border-bottom: 1px solid var(--line); }
+.bar .t { font-family: var(--cinzel); font-weight: 700; font-size: 19px; letter-spacing: .26em; color: var(--lav); }
+.bar .s { margin-top: 4px; font-family: var(--ui); font-weight: 700; font-size: 11.5px; letter-spacing: .24em; color: var(--text-3); text-transform: uppercase; }
+main { flex: 1; display: flex; flex-direction: column; padding: 24px 22px max(26px, env(safe-area-inset-bottom)); }
+.mid { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; }
+.wm img { height: 74px; width: auto; display: block; margin: 0 auto; filter: drop-shadow(0 0 24px rgba(176,127,224,.35)); }
+.lbl { font-weight: 700; font-size: 11px; letter-spacing: .28em; text-transform: uppercase; color: var(--text-3); }
+h1 { margin: 0; font-family: var(--cinzel); font-weight: 600; font-size: clamp(30px, 9vw, 40px); line-height: 1.08; letter-spacing: .04em; }
+.story { font-family: var(--garamond); font-style: italic; font-size: 20px; line-height: 1.35; color: var(--text-2); max-width: 22em; }
+.field { width: 100%; height: 60px; border-radius: 16px; border: 1px solid var(--line-2); background: rgba(255,255,255,.04); color: var(--text);
+  text-align: center; font-family: var(--cinzel); font-weight: 700; font-size: 24px; letter-spacing: .14em; text-transform: uppercase; outline: none; }
+.field:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(176,123,255,.2); }
+.slab { width: 100%; height: 64px; border-radius: 16px; background: var(--slab); color: var(--ink); font-family: var(--cinzel); font-weight: 700; font-size: 22px;
+  letter-spacing: .16em; box-shadow: 0 10px 30px rgba(122,74,168,.35), inset 0 1px 0 rgba(255,255,255,.35); }
+.slab:active { transform: translateY(1px); filter: brightness(1.08); }
+.slab:disabled { opacity: .55; }
+.err { min-height: 20px; color: var(--demon); font-size: 15px; font-weight: 600; }
+.foot { text-align: center; color: var(--text-3); font-size: 13px; line-height: 1.45; }
+.pulse { width: 12px; height: 12px; border-radius: 50%; background: var(--lav); box-shadow: 0 0 16px var(--lav-2); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; transform: scale(.75); } }
+
+/* faces */
+.coin { border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 35%, #1a1622, #08070c 70%); box-shadow: inset 0 0 0 1px var(--line-2);
+  display: grid; place-items: center; flex: none; }
+.coin img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.coin .ini { font-family: var(--cinzel); }
+
+/* ---- Lesser Evil ---- */
+body.le { background: radial-gradient(46% 54% at 30% 12%, rgba(46,92,168,.36), rgba(46,92,168,0) 66%), radial-gradient(46% 54% at 70% 12%, rgba(181,49,49,.32), rgba(181,49,49,0) 66%),
+  radial-gradient(at 50% -10%, #16294a, #0b1526 70%); color: var(--le-cream); }
+body.le .bar { background: rgba(11,21,38,.92); border-bottom: 0; box-shadow: inset 0 -4px 0 0 transparent; position: relative; }
+body.le .bar::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: linear-gradient(90deg, #22468c 0 50%, #b53131 50% 100%); }
+body.le .bar .t { font-family: var(--oswald); font-weight: 700; letter-spacing: .14em; color: var(--le-cream); }
+body.le .slab { background: linear-gradient(#d1483f, #b53131 55%, #7e2323); color: #fff; box-shadow: 0 10px 30px rgba(181,49,49,.35), inset 0 1px 0 rgba(255,255,255,.3); }
+body.le h1 { color: var(--le-cream); }
+body.le .lbl { font-family: var(--oswald); font-weight: 600; letter-spacing: .16em; color: rgba(245,241,232,.7); }

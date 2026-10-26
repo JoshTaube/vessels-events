@@ -1,0 +1,476 @@
+{
+  "format": "vessels-show/1",
+  "id": "sample-night",
+  "name": "Vessels Live · Sample Night",
+  "date": "Sample",
+  "venue": "Rehearsal",
+  "hostCode": "HOST-9KX",
+  "audience": {
+    "url": "https://vessels-events.netlify.app/vote"
+  },
+  "cast": [
+    {
+      "id": "ava",
+      "name": "Ava",
+      "code": "ASH-7Q2",
+      "photo": "photos/ava.webp"
+    },
+    {
+      "id": "bram",
+      "name": "Bram",
+      "code": "BONE-4T8",
+      "photo": "photos/bram.webp"
+    },
+    {
+      "id": "cleo",
+      "name": "Cleo",
+      "code": "CROW-2M9",
+      "photo": "photos/cleo.webp"
+    },
+    {
+      "id": "dex",
+      "name": "Dex",
+      "code": "DUSK-8R3",
+      "photo": "photos/dex.webp"
+    },
+    {
+      "id": "elke",
+      "name": "Elke",
+      "code": "EMBR-5K7",
+      "photo": "photos/elke.webp"
+    },
+    {
+      "id": "felix",
+      "name": "Felix",
+      "code": "FOG-3W6",
+      "photo": "photos/felix.webp"
+    },
+    {
+      "id": "greta",
+      "name": "Greta",
+      "code": "GRAV-9P4",
+      "photo": "photos/greta.webp"
+    },
+    {
+      "id": "hugo",
+      "name": "Hugo",
+      "code": "HUSH-6D2",
+      "photo": "photos/hugo.webp"
+    },
+    {
+      "id": "iris",
+      "name": "Iris",
+      "code": "IVY-4N8",
+      "photo": "photos/iris.webp"
+    },
+    {
+      "id": "jonah",
+      "name": "Jonah",
+      "code": "JINX-7C5",
+      "photo": "photos/jonah.webp"
+    },
+    {
+      "id": "kit",
+      "name": "Kit",
+      "code": "KNEL-2H9",
+      "photo": "photos/kit.webp"
+    },
+    {
+      "id": "lena",
+      "name": "Lena",
+      "code": "LUNA-8B3",
+      "photo": "photos/lena.webp"
+    }
+  ],
+  "lesserEvil": {
+    "prompts": [
+      {
+        "id": "le1",
+        "bank": "harmless",
+        "text": "Pineapple should be a standard pizza topping"
+      },
+      {
+        "id": "le2",
+        "bank": "absurd",
+        "text": "Hot dogs should be legally classified as sandwiches"
+      },
+      {
+        "id": "le3",
+        "bank": "hard",
+        "text": "Christmas music should be fair game starting November 1st"
+      },
+      {
+        "id": "le4",
+        "bank": "harmless",
+        "text": "Cereal should always be eaten dry"
+      }
+    ],
+    "voteSecs": 30
+  },
+  "media": {
+    "menuLoop": "../../../Vessels_6_12/main_menu_demon_idle.mp4"
+  },
+  "music": {
+    "tracks": [
+      {
+        "button": 1,
+        "name": "Menu",
+        "file": "../../../Vessels_6_12/menu-music.mp3"
+      },
+      {
+        "button": 2,
+        "name": "Lobby",
+        "file": "../../../Vessels_6_12/classic-lobby-music.mp3"
+      },
+      {
+        "button": 3,
+        "name": "Lesser Evil rounds",
+        "file": "../../../Vessels_6_12/le-main-rounds.mp3"
+      },
+      {
+        "button": 4,
+        "name": "Lesser Evil vote",
+        "file": "../../../Vessels_6_12/le_voting_music.mp3"
+      },
+      {
+        "button": 5,
+        "name": "Night",
+        "file": "../../../Vessels_6_12/night-music.mp3"
+      },
+      {
+        "button": 6,
+        "name": "Day testimony",
+        "file": "../../../Vessels_6_12/day_testimony_classic.mp3"
+      },
+      {
+        "button": 7,
+        "name": "Vessels vote",
+        "file": "../../../Vessels_6_12/classic_mode_voting_music.mp3"
+      },
+      {
+        "button": 8,
+        "name": "End results",
+        "file": "../../../Vessels_6_12/end_results_music.mp3"
+      }
+    ],
+    "stingers": [
+      {
+        "name": "Gavel",
+        "file": "../../../Vessels_6_12/le-gavel.mp3"
+      },
+      {
+        "name": "Chime",
+        "file": "../../../Vessels_6_12/Player-join-chime.mp3"
+      },
+      {
+        "name": "Woosh",
+        "file": "../../../Vessels_6_12/phase-transition-woosh-classic.mp3"
+      },
+      {
+        "name": "Coin flip",
+        "file": "../../../Vessels_6_12/coin-flip-sound.mp3"
+      }
+    ]
+  },
+  "cues": [
+    {
+      "id": "101",
+      "title": "Doors open",
+      "screen": {
+        "type": "menu-loop",
+        "tagline": "One among you is not who they say."
+      }
+    },
+    {
+      "id": "110",
+      "title": "Cast check-in",
+      "screen": {
+        "type": "checkin",
+        "kicker": "Tonight’s vessels",
+        "title": "The cast is arriving"
+      }
+    },
+    {
+      "id": "120",
+      "title": "Starting soon",
+      "timer": 300,
+      "screen": {
+        "type": "card",
+        "kicker": "Find your seat",
+        "title": "We begin shortly",
+        "body": "Phones out. You’re the jury tonight."
+      }
+    },
+    {
+      "id": "201",
+      "title": "Welcome",
+      "lock": "cast",
+      "say": "Good evening, and welcome to Vessels Live!",
+      "screen": {
+        "type": "title",
+        "logo": true,
+        "kicker": "Live",
+        "title": "Welcome",
+        "subtitle": "Two games. Twelve players. You decide."
+      }
+    },
+    {
+      "id": "210",
+      "title": "Meet the cast",
+      "say": "Let’s meet tonight’s twelve.",
+      "screen": {
+        "type": "checkin",
+        "kicker": "Tonight’s vessels",
+        "title": "Meet the cast"
+      }
+    },
+    {
+      "id": "220",
+      "title": "You are the jury",
+      "say": "They play. You vote. Scan the code on screen.",
+      "screen": {
+        "type": "card",
+        "kicker": "How tonight works",
+        "title": "You are the jury",
+        "body": "Scan the code. Every vote is yours. The cast never votes."
+      }
+    },
+    {
+      "id": "230",
+      "title": "Practice vote",
+      "timer": 30,
+      "say": "Let’s try one. This vote doesn’t count.",
+      "screen": {
+        "type": "practice-vote",
+        "title": "Who should go first?"
+      }
+    },
+    {
+      "id": "240",
+      "title": "Practice result",
+      "say": "Perfect. You’re ready.",
+      "screen": {
+        "type": "card",
+        "kicker": "Practice",
+        "title": "You’re ready",
+        "body": "That one didn’t count. The next ones will."
+      }
+    },
+    {
+      "id": "301",
+      "title": "Lesser Evil",
+      "say": "Game one: Lesser Evil.",
+      "screen": {
+        "type": "title",
+        "logo": true,
+        "kicker": "Game one",
+        "subtitle": "Defend the indefensible."
+      }
+    },
+    {
+      "id": "305",
+      "title": "How Lesser Evil works",
+      "screen": {
+        "type": "card",
+        "kicker": "Lesser Evil",
+        "title": "Pick your poison",
+        "body": "Candidates argue a position. You vote for the lesser evil."
+      }
+    },
+    {
+      "id": "310",
+      "title": "The race",
+      "engine": "start",
+      "say": "Candidates, take your places. Audience: phones out, you decide every round.",
+      "screen": {
+        "type": "game",
+        "game": "lesser-evil",
+        "title": "The race"
+      }
+    },
+    {
+      "id": "390",
+      "title": "Lesser Evil winner",
+      "say": "Your Lesser Evil! And the prize: they pick their own role for Vessels.",
+      "screen": {
+        "type": "title",
+        "kicker": "Lesser Evil",
+        "title": "Your winner",
+        "winner": "le"
+      }
+    },
+    {
+      "id": "401",
+      "title": "Intermission",
+      "timer": 900,
+      "say": "Fifteen minutes. Grab a drink. Keep your phones charged.",
+      "screen": {
+        "type": "intermission",
+        "kicker": "Intermission",
+        "title": "Back in",
+        "subtitle": "Grab a drink. The spirits will wait."
+      }
+    },
+    {
+      "id": "410",
+      "title": "Places",
+      "say": "Take your seats. The game is about to begin.",
+      "screen": {
+        "type": "card",
+        "kicker": "Take your seats",
+        "title": "Vessels begins",
+        "body": "One among them is not who they say."
+      }
+    },
+    {
+      "id": "501",
+      "title": "Vessels",
+      "say": "Game two: Vessels.",
+      "screen": {
+        "type": "title",
+        "logo": true,
+        "kicker": "Game two",
+        "title": "Classic mode",
+        "subtitle": "One among you is not who they say."
+      }
+    },
+    {
+      "id": "505",
+      "title": "Roles dealt",
+      "replayStart": true,
+      "screen": {
+        "type": "game",
+        "game": "vessels",
+        "title": "The roles are dealt"
+      },
+      "engine": "start",
+      "say": "The roles are dealt. Check your phones, and keep them to yourselves."
+    },
+    {
+      "id": "510",
+      "title": "The floor",
+      "screen": {
+        "type": "game",
+        "game": "vessels",
+        "title": "Who are you?"
+      }
+    },
+    {
+      "id": "520",
+      "title": "Night {round} falls",
+      "screen": {
+        "type": "game",
+        "game": "vessels",
+        "title": "Night falls",
+        "showRound": true
+      }
+    },
+    {
+      "id": "530",
+      "title": "Dawn",
+      "screen": {
+        "type": "game",
+        "game": "vessels",
+        "title": "Dawn"
+      }
+    },
+    {
+      "id": "540",
+      "title": "Testimony",
+      "screen": {
+        "type": "game",
+        "game": "vessels",
+        "title": "Testimony"
+      }
+    },
+    {
+      "id": "550",
+      "title": "The accused",
+      "say": "Deliberation is over. I’m naming the accused.",
+      "screen": {
+        "type": "game",
+        "game": "vessels",
+        "title": "The accused"
+      }
+    },
+    {
+      "id": "560",
+      "title": "Audience votes",
+      "timer": 30,
+      "say": "Jury, vote now.",
+      "screen": {
+        "type": "vote",
+        "title": "Who leaves the house?"
+      }
+    },
+    {
+      "id": "570",
+      "title": "The verdict",
+      "loopTo": "520",
+      "loopLabel": "Next night",
+      "exitLabel": "Game over",
+      "screen": {
+        "type": "game",
+        "game": "vessels",
+        "title": "The verdict"
+      }
+    },
+    {
+      "id": "580",
+      "title": "Game over",
+      "loopTo": "505",
+      "loopTimes": 0,
+      "replay": true,
+      "loopLabel": "Play again, same cast",
+      "exitLabel": "On to the finale",
+      "screen": {
+        "type": "game",
+        "game": "vessels",
+        "title": "Game over"
+      }
+    },
+    {
+      "id": "601",
+      "title": "Curtain call",
+      "say": "Give it up for tonight’s cast!",
+      "screen": {
+        "type": "checkin",
+        "kicker": "Curtain call",
+        "title": "Tonight’s vessels"
+      }
+    },
+    {
+      "id": "610",
+      "title": "MVP of the night",
+      "say": "And tonight’s MVP is...",
+      "screen": {
+        "type": "mvp",
+        "title": "MVP of the night"
+      }
+    },
+    {
+      "id": "620",
+      "title": "Take it home",
+      "say": "Play all of these on the app.",
+      "screen": {
+        "type": "download",
+        "title": "Play tonight’s games",
+        "games": [
+          "Lesser Evil",
+          "Vessels"
+        ],
+        "more": [
+          "Sinking Ship"
+        ]
+      }
+    },
+    {
+      "id": "690",
+      "title": "House music",
+      "screen": {
+        "type": "menu-loop",
+        "tagline": "Thank you. Good night."
+      }
+    }
+  ]
+}

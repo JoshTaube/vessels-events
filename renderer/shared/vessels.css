@@ -1,0 +1,61 @@
+/* Vessels Events: the house look, shared by the operator console and the audience display.
+   Vessels is the current production design, "Direction 2B" (Vessels_6_12: the Classic Player 9.21 screens, App Home
+   2a): near-black #04040A under a soft purple glow, lavender accents, Cinzel headings, Inter for UI, EB Garamond
+   italic for story lines, purple gradient slabs for the main action. Lesser Evil keeps its own red, white and blue
+   (lesser-evil.css: navy, red #B53131, cream #F5F1E8, Oswald labels); see .le in screens.css. Fonts bundled. */
+@import url('../fonts/fonts.css');
+
+:root {
+  --bg: #04040a;
+  --panel: rgba(255,255,255,.035);     /* cards */
+  --panel-2: rgba(255,255,255,.06);    /* raised rows, inputs */
+  --panel-3: rgba(255,255,255,.09);
+  --line: rgba(255,255,255,.1);        /* hairlines */
+  --line-2: rgba(255,255,255,.16);
+  --text: #ffffff;
+  --text-2: rgba(255,255,255,.72);
+  --text-3: rgba(255,255,255,.45);
+  --text-4: rgba(255,255,255,.28);
+  --lav: #d4a8f5;                      /* light lavender: headings, numbers */
+  --lav-2: #b07fe0;                    /* lavender: labels, rings */
+  --violet: #b07bff;                   /* active borders */
+  --lav-deep: #7a4aa8;
+  --plum-ink: #17091f;                 /* text on the purple slab */
+  --slab: linear-gradient(#d4a8f5, #b07fe0 45%, #7a4aa8);
+  --slab-hi: linear-gradient(#e9d4ff, #b07fe0 45%, #7a4aa8);
+  --glow: radial-gradient(120% 80% at 50% 30%, rgba(176,127,224,.18), rgba(0,0,0,0) 60%);
+  --demon: #e0524f;                    /* role colours, as the player screens use them */
+  --priest: #5a9abf;
+  --nun: #a8d8b0;
+  --final-girl: #e08894;
+  --live: #3ddc6e;                     /* checked in */
+  /* Lesser Evil */
+  --le-navy: #1a2a4a; --le-navy-2: #12203a; --le-navy-3: #0b1526;
+  --le-blue: #22468c; --le-blue-2: #3f6fd1; --le-red: #b53131; --le-red-2: #d1483f; --le-cream: #f5f1e8;
+  --cinzel: 'Cinzel', 'Times New Roman', serif;
+  --garamond: 'EB Garamond', Georgia, serif;
+  --oswald: 'Oswald', 'Arial Narrow', sans-serif;
+  --ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.hidden { display: none !important; }
+
+/* small caps label, wide tracking (the design's section labels) */
+.lbl { font-family: var(--ui); font-size: 11px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: var(--text-3); }
+.lbl.lav { color: var(--lav-2); }
+.cz { font-family: var(--cinzel); letter-spacing: .08em; }
+
+/* the VESSELS wordmark: the production art when it's there, Cinzel otherwise */
+.wordmark { display: block; }
+.wordmark img { display: block; height: 100%; width: auto; }
+.wordmark .wm-text { font-family: var(--cinzel); font-weight: 500; letter-spacing: .32em; color: var(--text); }
+
+/* portrait coin: a photo, or the initial in Cinzel, in a ring (the player screens' face grid) */
+.coin { position: relative; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #1a1622, #08070c 70%);
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 10px 30px rgba(0,0,0,.6); display: grid; place-items: center; overflow: hidden; flex: none; }
+.coin img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.coin .ini { font-family: var(--cinzel); color: var(--text); line-height: 1; }

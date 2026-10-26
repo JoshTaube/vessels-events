@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#04040a">
+<title>Vessels · Cast</title>
+<link rel="stylesheet" href="ev.css">
+<script src="event-config.js"></script>
+<script src="ev.js"></script>
+<style>
+  .codeform { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; margin: 0 auto; }
+  .who { font-family: var(--cinzel); font-weight: 600; font-size: clamp(40px, 13vw, 58px); letter-spacing: .05em; text-shadow: 0 0 40px rgba(176,127,224,.4); }
+  .state { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 12px; letter-spacing: .26em; text-transform: uppercase; color: var(--text-2); }
+  .notme { margin-top: 18px; color: var(--text-3); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<!-- Vessels Events: the cast's home base all night. A cast member enters their private code once: that checks them
+     in (their seat goes green on the operator's console) and leaves their exact name on this phone. From then on this
+     page, and the game pages, follow the show: when the launcher opens Lesser Evil the phone goes there, then Vessels.
+     Their name joins them, so the game gives back their own seat on any phone. -->
+<div class="bar"><div class="t">VESSELS</div><div class="s" id="sub">Cast</div></div>
+<main>
+  <section class="mid" id="vCode">
+    <div class="wm"><img src="ev/assets/vessels-wordmark.png" alt="Vessels"></div>
+    <div class="story" id="codeWhy">Welcome to the stage.</div>
+    <form class="codeform" id="form" autocomplete="off">
+      <div class="lbl">Enter your cast code</div>
+      <input class="field" id="code" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="12" aria-label="Cast code">
+      <button class="slab" id="go" type="submit">ENTER</button>
+      <div class="err" id="err"></div>
+    </form>
+    <div class="foot">Your code is on your cast card. It's yours all night.</div>
+  </section>
+
+  <section class="mid hidden" id="vIn">
+    <div class="lbl">You're in</div>
+    <div class="who" id="who"></div>
+    <div class="story" id="inLine">Hold tight. Your game opens here.</div>
+    <div class="state"><span class="pulse"></span><span id="inState">Waiting for the show</span></div>
+    <button class="notme" id="notMe">Not you? Enter a different code</button>
+  </section>
+</main>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const qs = new URLSearchParams(location.search);
+  const me0 = EV.me();
+  const SHOW = (qs.get('s') || (window.VL_CONFIG && VL_CONFIG.show) || (me0 && me0.show) || '').toLowerCase();
+  const GAME_NAME = { le: 'Lesser Evil', cv: 'Vessels' };
+  const WHY = { replaced: 'Your seat moved to another phone. Enter your code to take it back here.',
+                redo: 'Enter your code again, please.', unknown: 'Enter your code to take your seat.' };
+  if (qs.get('why') && WHY[qs.get('why')]) $('codeWhy').textContent = WHY[qs.get('why')];
+
+  function show(view) { $('vCode').classList.toggle('hidden', view !== 'code'); $('vIn').classList.toggle('hidden', view !== 'in'); }
+  // Into the live game: Vessels or Lesser Evil, by room code. The game page joins by name on its own.
+  function go(r) {
+    if (!r || !r.live_room || !r.live_game) return false;
+    $('inState').textContent = 'Taking you to ' + (GAME_NAME[r.live_game] || 'the game');
+    const page = r.live_game === 'le' ? 'lesser-evil-player.html' : 'player.html';
+    setTimeout(() => location.replace('/' + page + '?game=' + encodeURIComponent(r.live_room)), 700);
+    return true;
+  }
+  let timer = null;
+  function waiting(name) {
+    show('in'); $('who').textContent = name; $('sub').textContent = 'Cast · ' + name;
+    const tick = () => EV.pingOnce(null).then((r) => { if (r && r.ok) go(r); else if (!r) $('inState').textContent = 'Reconnecting'; });
+    clearInterval(timer); timer = setInterval(tick, 3000); tick();
+  }
+
+  if (!SHOW) { $('codeWhy').textContent = 'Scan the cast QR from the stage to begin.'; $('form').classList.add('hidden'); show('code'); return; }
+  if (me0 && me0.show === SHOW) waiting(me0.name); else show('code');
+
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = $('code').value.trim().toUpperCase();
+    if (!code) { $('err').textContent = 'Enter your code'; return; }
+    $('go').disabled = true; $('err').textContent = '';
+    EV.rpc('ev_join', { p_show: SHOW, p_code: code, p_device: EV.device() }).then((r) => {
+      $('go').disabled = false;
+      if (!r || !r.ok) { $('err').textContent = 'That code isn’t on tonight’s cast list'; return; }
+      EV.setMe({ show: SHOW, cast_id: r.cast_id, name: r.name, redo: r.redo });
+      waiting(r.name);
+    }, () => { $('go').disabled = false; $('err').textContent = 'No connection. Try again'; });
+  });
+  $('code').addEventListener('input', () => { $('err').textContent = ''; });
+  $('notMe').addEventListener('click', () => { EV.clearMe(); clearInterval(timer); $('code').value = ''; show('code'); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+/* Vessels Events: the audience display's 1920x1080 stage (also the console's live preview, scaled down).
+   Vessels = Direction 2B: #04040A under a purple glow, lavender labels, white Cinzel, Garamond italic story lines.
+   .le = Lesser Evil: the navy stage with blue and red glows, the flag stripe, cream Cinzel, Oswald labels. */
+.stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); transform-origin: 0 0; color: var(--text); }
+.stage .layer { position: absolute; inset: 0; }
+.stage .layer.top { pointer-events: none; }
+.stage .scr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 140px;
+  background: radial-gradient(120% 80% at 50% 30%, rgba(176,127,224,.2), rgba(0,0,0,0) 60%), radial-gradient(90% 70% at 50% 110%, rgba(122,74,168,.14), rgba(0,0,0,0) 60%), var(--bg);
+  animation: scr-in .6s ease both; }
+@keyframes scr-in { from { opacity: 0; } to { opacity: 1; } }
+.stage .scr.black { background: #000; }
+.stage .kick { font-family: var(--ui); font-weight: 700; font-size: 24px; letter-spacing: .34em; text-transform: uppercase; color: var(--lav-2); margin-bottom: 26px; }
+.stage h1 { margin: 0; font-family: var(--cinzel); font-weight: 600; font-size: 132px; line-height: 1.05; letter-spacing: .06em; text-shadow: 0 0 60px rgba(176,127,224,.35); }
+.stage h2 { margin: 0; font-family: var(--cinzel); font-weight: 600; font-size: 92px; line-height: 1.08; letter-spacing: .05em; text-shadow: 0 0 50px rgba(176,127,224,.3); }
+.stage .sub { margin-top: 28px; font-family: var(--garamond); font-style: italic; font-size: 48px; color: var(--text-2); max-width: 1400px; }
+.stage p { margin: 34px 0 0; font-family: var(--garamond); font-style: italic; font-size: 50px; line-height: 1.35; color: var(--text-2); max-width: 1400px; }
+.stage .wordmark { margin-bottom: 40px; filter: drop-shadow(0 0 30px rgba(176,127,224,.35)); }
+.stage .lelogo { margin-bottom: 40px; }
+.stage .lelogo img { height: 100%; width: auto; display: block; }
+.stage .timer { position: absolute; right: 70px; bottom: 56px; font-family: var(--cinzel); font-weight: 600; font-size: 64px; letter-spacing: .06em; color: var(--lav); font-variant-numeric: tabular-nums; }
+.stage [data-timer].low { color: var(--demon); }
+.stage .note { position: absolute; left: 0; right: 0; bottom: 48px; font-family: var(--ui); font-weight: 600; font-size: 20px; letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.22); }
+
+/* the hold loop: the menu loop video, or smoke drifting behind the wordmark */
+.stage .scr.loop { background: #000; }
+.stage .bgvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.stage .loopmark { position: relative; display: flex; flex-direction: column; align-items: center; animation: breathe 6s ease-in-out infinite; }
+.stage .loopmark .wordmark, .stage .loopmark .lelogo { margin: 0; }
+.stage .tagline { margin-top: 30px; font-family: var(--garamond); font-style: italic; font-size: 46px; color: var(--text-2); }
+@keyframes breathe { 0%, 100% { opacity: .82; transform: scale(1); } 50% { opacity: 1; transform: scale(1.02); } }
+.stage .smoke { position: absolute; width: 1400px; height: 900px; border-radius: 50%; filter: blur(90px); opacity: .4; mix-blend-mode: screen; }
+.stage .smoke.s1 { left: -300px; top: 80px; background: radial-gradient(circle, #4a2a6a 0%, transparent 70%); animation: drift1 26s ease-in-out infinite alternate; }
+.stage .smoke.s2 { right: -360px; top: -120px; background: radial-gradient(circle, #3a1a4a 0%, transparent 70%); animation: drift2 32s ease-in-out infinite alternate; }
+.stage .smoke.s3 { left: 420px; bottom: -520px; background: radial-gradient(circle, #2a2240 0%, transparent 70%); animation: drift3 22s ease-in-out infinite alternate; }
+@keyframes drift1 { to { transform: translate(380px, -60px) scale(1.15); } }
+@keyframes drift2 { to { transform: translate(-420px, 140px) scale(.9); } }
+@keyframes drift3 { to { transform: translate(-260px, -120px) scale(1.2); } }
+
+/* check-in: the player screens' face grid; a seat lights lavender when that cast member's phone is in */
+.stage .scr.checkin h2 { font-size: 72px; }
+.stage .cast { display: grid; grid-template-columns: repeat(6, 200px); gap: 34px 46px; margin-top: 60px; }
+.stage .seat { display: flex; flex-direction: column; align-items: center; gap: 16px; opacity: .32; filter: grayscale(1); transition: opacity .5s, filter .5s; }
+.stage .seat .nm { font-family: var(--cinzel); font-weight: 600; font-size: 28px; letter-spacing: .1em; }
+.stage .seat.in { opacity: 1; filter: none; }
+.stage .seat.in .coin { box-shadow: inset 0 0 0 3px var(--violet), 0 0 44px rgba(176,123,255,.45); }
+.stage .gathered { margin-top: 56px; display: flex; align-items: center; gap: 22px; font-family: var(--ui); font-weight: 600; font-size: 26px; letter-spacing: .42em; text-transform: uppercase; color: var(--text-2); }
+.stage .gathered .sig { width: 14px; height: 14px; border-radius: 50%; background: var(--lav); box-shadow: 0 0 18px var(--lav-2); }
+
+/* votes: the candidates with the design's lavender bar (filled at the reveal), how many have voted, the clock */
+.stage .faces { display: flex; flex-wrap: wrap; justify-content: center; gap: 40px 90px; margin-top: 60px; max-width: 1180px; }
+.stage .faces.n5, .stage .faces.n6 { gap: 34px 44px; }
+.stage .face { display: flex; flex-direction: column; align-items: center; gap: 18px; transition: opacity .4s; }
+.stage .face .nm { font-family: var(--cinzel); font-weight: 600; font-size: 34px; letter-spacing: .08em; }
+.stage .faces.n6 .face .nm { font-size: 26px; }
+.stage .face .bar { width: 200px; height: 10px; border-radius: 5px; background: rgba(255,255,255,.08); overflow: hidden; }
+.stage .faces.n6 .face .bar { width: 140px; }
+.stage .face .bar i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #7a4aa8, #d4a8f5); transition: width 1.2s cubic-bezier(.2,.8,.2,1); }
+.stage .face .pct { font-family: var(--cinzel); font-weight: 600; font-size: 30px; color: var(--lav); margin-top: -6px; }
+.stage .face.win .coin { box-shadow: inset 0 0 0 4px var(--lav), 0 0 70px rgba(176,127,224,.6); }
+.stage .face.lose { opacity: .42; }
+/* a vote between sides, not people (Lesser Evil's sudden death: FOR or AGAINST) */
+.stage .face.side { width: 460px; padding: 34px 30px; border-radius: 24px; background: rgba(255,255,255,.03); box-shadow: inset 0 0 0 1px rgba(176,123,255,.35); }
+.stage .face.side .nm { font-family: var(--garamond); font-style: italic; font-weight: 400; font-size: 38px; line-height: 1.25; letter-spacing: 0; }
+.stage .face.side.win { box-shadow: inset 0 0 0 3px var(--lav), 0 0 60px rgba(176,127,224,.4); }
+.stage .vcount { position: absolute; left: 70px; bottom: 56px; font-family: var(--cinzel); font-weight: 600; font-size: 40px; letter-spacing: .06em; color: var(--text-2); }
+.stage .vcount b { color: var(--lav); font-variant-numeric: tabular-nums; }
+
+/* Lesser Evil's champion on its winner card */
+.stage .scr.crowned h1 { font-size: 96px; }
+.stage .champ { display: flex; flex-direction: column; align-items: center; gap: 22px; margin-top: 44px; animation: rise .9s cubic-bezier(.2,.8,.2,1) both; }
+.stage .champ .coin { box-shadow: inset 0 0 0 5px var(--le-cream, #f5f1e8), 0 0 90px rgba(46,92,168,.6); }
+.stage .champ .nm { font-family: var(--oswald); font-weight: 700; font-size: 86px; letter-spacing: .08em; text-transform: uppercase; color: var(--le-cream, #f5f1e8); }
+/* the MVP: their face, their skill points and where they came from; co-MVPs side by side */
+.stage .mvps { display: flex; gap: 90px; margin-top: 46px; }
+.stage .mvpc { display: flex; flex-direction: column; align-items: center; gap: 14px; animation: rise .9s cubic-bezier(.2,.8,.2,1) both; }
+.stage .mvpc .coin { box-shadow: inset 0 0 0 5px var(--lav), 0 0 90px rgba(176,127,224,.55); }
+.stage .mvpc .nm { font-family: var(--cinzel); font-weight: 600; font-size: 70px; letter-spacing: .06em; }
+.stage .scr.co .mvpc .nm { font-size: 56px; }
+.stage .mvpc .pts { font-family: var(--ui); font-weight: 700; font-size: 26px; letter-spacing: .3em; text-transform: uppercase; color: var(--lav-2); }
+.stage .mvpc .lines { list-style: none; margin: 14px 0 0; padding: 0; min-width: 640px; }
+.stage .mvpc .lines li { display: flex; justify-content: space-between; gap: 30px; padding: 10px 4px; border-bottom: 1px solid rgba(255,255,255,.08); font-family: var(--garamond); font-style: italic; font-size: 34px; color: var(--text-2); }
+.stage .mvpc .lines li b { font-family: var(--cinzel); font-style: normal; font-weight: 600; color: var(--lav); }
+@keyframes rise { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: none; } }
+
+.stage .scr.inter .big { margin-top: 40px; font-family: var(--cinzel); font-weight: 600; font-size: 220px; line-height: 1; letter-spacing: .04em; color: var(--lav); font-variant-numeric: tabular-nums; text-shadow: 0 0 80px rgba(176,127,224,.45); }
+
+/* finale: download */
+.stage .games { display: flex; gap: 40px; margin-top: 56px; }
+.stage .games .g { height: 150px; padding: 0 56px; border-radius: 20px; display: grid; place-items: center; background: rgba(255,255,255,.035); box-shadow: inset 0 0 0 1px rgba(176,123,255,.55); }
+.stage .games .g .wordmark, .stage .games .g .lelogo { margin: 0; filter: none; }
+.stage .games .g.le-g { background: radial-gradient(at 50% -10%, #16294a, #0b1526 70%); box-shadow: inset 0 0 0 1px rgba(245,241,232,.25); }
+.stage .games .g b { font-family: var(--cinzel); font-weight: 600; font-size: 54px; letter-spacing: .08em; }
+.stage .more { margin-top: 44px; display: flex; align-items: center; gap: 30px; }
+.stage .more .lbl { font-size: 18px; }
+.stage .more .ss { height: 52px; width: auto; }
+.stage .more b { font-family: var(--cinzel); font-weight: 600; font-size: 38px; letter-spacing: .08em; color: var(--text-2); }
+.stage .stores { margin-top: 56px; display: flex; gap: 28px; }
+.stage .stores span { padding: 22px 52px; border-radius: 18px; background: var(--slab); color: var(--plum-ink); font-family: var(--cinzel); font-weight: 700; font-size: 32px; letter-spacing: .08em; box-shadow: 0 10px 40px rgba(122,74,168,.35); }
+
+/* ---- Lesser Evil: navy stage, blue and red glows, the flag stripe, cream type, Oswald labels ---- */
+.stage .scr.le { color: var(--le-cream);
+  background: radial-gradient(46% 54% at 30% 22%, rgba(46,92,168,.36), rgba(46,92,168,0) 66%), radial-gradient(46% 54% at 70% 22%, rgba(181,49,49,.32), rgba(181,49,49,0) 66%),
+    linear-gradient(rgba(0,0,0,0), rgba(46,92,168,.1) 55%, rgba(181,49,49,.1)), radial-gradient(at 50% -10%, #16294a, #0b1526 70%); }
+.stage .scr.le .kick { font-family: var(--oswald); font-weight: 600; font-size: 30px; letter-spacing: .2em; color: var(--le-cream); opacity: .85; }
+.stage .scr.le h1, .stage .scr.le h2 { color: var(--le-cream); text-shadow: 0 4px 30px rgba(0,0,0,.45); }
+.stage .scr.le .sub, .stage .scr.le p { color: rgba(245,241,232,.78); }
+.stage .scr.le .timer, .stage .scr.le .big { color: var(--le-cream); text-shadow: none; }
+.stage .scr.le .note { color: rgba(245,241,232,.25); }
+.stage .scr.le .seat.in .coin { box-shadow: inset 0 0 0 3px var(--le-cream), 0 0 40px rgba(46,92,168,.6); }
+.stage .scr.le .gathered .sig { background: var(--le-red-2); box-shadow: 0 0 18px var(--le-red); }
+.stage .scr.le .face .bar i { background: linear-gradient(90deg, var(--le-blue), var(--le-red)); }
+.stage .scr.le .face .nm { font-family: var(--oswald); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.stage .scr.le .face.side { background: rgba(245,241,232,.04); box-shadow: inset 0 0 0 1px rgba(245,241,232,.3); }
+.stage .scr.le .face.side .nm { font-family: var(--oswald); font-style: normal; font-weight: 500; font-size: 36px; text-transform: none; }
+.stage .scr.le .face.side.win, .stage .scr.le .face.win .coin { box-shadow: inset 0 0 0 3px var(--le-cream), 0 0 60px rgba(46,92,168,.55); }
+.stage .scr.le .face .pct, .stage .scr.le .vcount b { color: var(--le-cream); font-family: var(--oswald); }
+.stage .scr.le .vcount { font-family: var(--oswald); color: rgba(245,241,232,.7); letter-spacing: .1em; }
+.stage .le-stripe { position: absolute; left: 0; right: 0; height: 8px; background: linear-gradient(90deg, #22468c 0, #22468c 50%, #b53131 50%, #b53131 100%); }
+.stage .le-stripe.top { top: 0; } .stage .le-stripe.bot { bottom: 0; }
+.stage .le-live { position: absolute; left: 50px; top: 40px; display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-radius: 8px; background: var(--le-red);
+  font-family: var(--oswald); font-weight: 700; font-size: 26px; letter-spacing: .12em; color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+.stage .le-live i { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.5); animation: pulse 1.6s ease-in-out infinite; }
+
+/* the safety layer */
+.stage .safe.full { position: absolute; inset: 0; z-index: 5; }
+.stage .safe.full .scr { animation: scr-in .35s ease both; }
+.stage .safe.lower { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 22px; padding: 22px 46px;
+  border-radius: 999px; background: rgba(4,4,10,.92); box-shadow: inset 0 0 0 2px rgba(176,123,255,.7), 0 20px 60px rgba(0,0,0,.7); white-space: nowrap; animation: lower-in .4s ease both; }
+.stage .safe.lower .kick { margin: 0; font-size: 22px; }
+.stage .safe.lower b { font-family: var(--cinzel); font-weight: 600; font-size: 40px; letter-spacing: .06em; }
+.stage .safe.lower .pulse { width: 16px; height: 16px; border-radius: 50%; background: var(--lav); animation: pulse 1.2s ease-in-out infinite; }
+.stage .safe.lower.le { background: rgba(11,21,38,.95); box-shadow: inset 0 0 0 2px rgba(245,241,232,.5), 0 20px 60px rgba(0,0,0,.7); }
+.stage .safe.lower.le .kick { font-family: var(--oswald); color: var(--le-cream); letter-spacing: .2em; }
+.stage .safe.lower.le .pulse { background: var(--le-red-2); }
+@keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
+@keyframes lower-in { from { opacity: 0; transform: translate(-50%, 30px); } }
+
+/* ---- the audience QR ---- */
+/* modules are currentColor; the tile behind them is soft off-white (dark on light scans on every phone camera) */
+.stage .layer.qrl { pointer-events: none; z-index: 7; }
+.stage .cornerqr { position: absolute; left: 40px; bottom: 34px; display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: .86; animation: scr-in .6s ease both; }
+.stage .cornerqr .tile { width: 150px; height: 150px; padding: 7px; border-radius: 14px; background: #ece6f5; color: #04040a; box-shadow: 0 0 0 1px rgba(176,123,255,.35), 0 10px 30px rgba(0,0,0,.5); }
+.stage .cornerqr .tile .qr, .stage .bigqr .tile .qr { display: block; width: 100%; height: 100%; }
+.stage .cornerqr .cap { font-family: var(--ui); font-weight: 700; font-size: 15px; letter-spacing: .26em; text-transform: uppercase; color: var(--lav-2); }
+.stage .cornerqr.le .tile { background: var(--le-cream); color: var(--le-navy-3); box-shadow: 0 0 0 1px rgba(245,241,232,.3), 0 10px 30px rgba(0,0,0,.5); }
+.stage .cornerqr.le .cap { font-family: var(--oswald); font-weight: 600; font-size: 18px; letter-spacing: .18em; color: rgba(245,241,232,.8); }
+/* vote screens: the candidates and a big QR side by side */
+.stage .voterow { display: flex; align-items: center; gap: 110px; margin-top: 56px; }
+.stage .voterow .faces { margin-top: 0; }
+.stage .bigqr { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.stage .bigqr .tile { width: 300px; height: 300px; padding: 12px; border-radius: 22px; background: #f4f0fa; color: #04040a; box-shadow: 0 0 0 2px rgba(176,123,255,.55), 0 0 60px rgba(176,127,224,.3); }
+.stage .bigqr .cap { font-family: var(--cinzel); font-weight: 700; font-size: 34px; letter-spacing: .1em; color: var(--lav); }
+.stage .bigqr .url { font-family: var(--ui); font-size: 20px; color: var(--text-3); }
+.stage .scr.le .bigqr .tile { background: var(--le-cream); color: var(--le-navy-3); box-shadow: 0 0 0 2px rgba(245,241,232,.4), 0 0 60px rgba(46,92,168,.4); }
+.stage .scr.le .bigqr .cap { font-family: var(--oswald); color: var(--le-cream); letter-spacing: .16em; }
+.stage .scr.le .bigqr .url { color: rgba(245,241,232,.55); }
