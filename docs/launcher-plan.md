@@ -306,7 +306,7 @@ database and the live site (`npm run check:night`).
 
 ### The event site (vessels-events.netlify.app)
 - `web/build-event.js` generates it from production (`Vessels_6_12`): the two TVs, the two player pages and Lesser
-  Evil's scripts, repointed at the Vessels Events database, patched (`web/event-patches.js`, 34 anchored patches; a
+  Evil's scripts, repointed at the Vessels Events database, patched (`web/event-patches.js`, 40 anchored patches; a
   missing anchor fails the build), with **every script the pages load** (player-2b.js is the 2B player design:
   Vessels Live's build never shipped it, so its phones had the old look) and every asset the phone pages use.
 - `/cast` (the cast hub: private code, check-in, then it follows the show), `/vote` (the audience), `/api/now` (a
@@ -343,6 +343,17 @@ database and the live site (`npm run check:night`).
   (each phone picks one) and sudden death (FOR / AGAINST, shown as words). A vote closes on its timer, on V, or by
   leaving its cue; the counts go to the game as Vessels Live's hand-count override, keyed by the game's own ids.
   Every phone and the projector reveal together a few seconds later.
+- **The projector shows the games' own screens** (Josh: "the projector should show the game like the TV display").
+  During a Lesser Evil ballot the game's ballot board stays up (each candidate's position and slogan, its clock)
+  and the corner QR grows into a vote panel in the left margin, clear of the board. The vote closes on the game's
+  own ballot clock (the TV runs on the laptop, so it's the same clock); S5 moves that clock too, and V (closing
+  early) stops it. A game's vote reveals about 6 s after the close on the phones, the panel and the game together
+  (the game sees the close on its 1.5 s poll, then holds 4.4 s); the practice vote reveals after 4 s. Event patches make
+  the board true at an event: its "from the audience" count is the /vote total (the launcher pushes it in), the
+  "Voters 0/3 · Still to vote" line goes, the room vote lists who's in it instead of live bars from cast votes that
+  never come, and the reveal counts the audience and names the winner. Core Vessels' vote is the one place the
+  launcher's own screen stays: the game's vote screen is the room's checklist ("9 of 12 have passed judgment"),
+  which can't show an audience choosing between 2 or 3 suspects. The verdict after it is the game's own.
 - **The prize** (Josh: the Lesser Evil winner picks their Vessels role). When the race crowns its winner the
   launcher offers their phone (only theirs) the night's deal for the table size; they lock one in (or the operator
   picks for them on the console). The first Vessels deal is held until the pick is in the game's hands

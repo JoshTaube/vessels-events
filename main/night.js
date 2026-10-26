@@ -23,7 +23,10 @@ require(path.join(__dirname, '..', 'web', 'audience-bridge.js'));
 const VLE = globalThis.VLE;
 
 const TICK_MS = 500;
-const REVEAL_MS = 4000;      // phones, /vote and the TV all flip to the result this long after a close
+const REVEAL_MS = 4000;      // phones and the projector flip to the result this long after a close (the practice vote)
+// a game's vote: the game itself reveals ~5 to 7 s after the close (it sees the close on its 1.5 s poll, then holds
+// 4.4 s), so the phones and the vote panel wait as long, and everyone sees the result together
+const GAME_REVEAL_MS = 6000;
 const LIVE_MS = 15000;       // a cast phone that hasn't pinged for this long shows as dropped
 const LE_VOTE_SECS = 30;
 
@@ -62,7 +65,8 @@ function leStep(game, players, voteOpen) {
   const kind = { room_vote: 'Room vote', sudden_death: 'Sudden death', final: 'The final' }[st.type] || ('Round ' + ((le.stage_idx || 0) + 1));
   const sub = { pick: 'picking positions', speech: st.holder ? `${name(st.holder)} has the floor` : 'speeches', ballot: 'ballot',
     reveal: 'the reveal', rps: 'rock paper scissors', endorse: 'the kingmaker decides', assign: 'teams choose sides' }[st.sub] || st.sub || '';
-  const extra = [{ action: 'startTimer', label: 'Start the speech clock' }, { action: 'extend', label: '+30 s' }, { action: 'skip', label: 'Skip the clock' }];
+  // (no +30 s here: in Lesser Evil only a speaker can buy their own extra time, and it counts in a tiebreak)
+  const extra = [{ action: 'startTimer', label: 'Start the speech clock' }, { action: 'skip', label: 'Skip the clock' }];
   return { where: kind + (sub ? ': ' + sub : ''), action: 'next', label: 'Next', extra };
 }
 // The roles tv.html deals to a table of n (classicSpecials, with the device options left at their defaults): the
@@ -76,7 +80,7 @@ function dealFor(n) {
 }
 
 // what each Lesser Evil step runs inside its TV
-const LE_ACTIONS = { start: 'leIntroStart', skipIntro: 'leIntroSkip', next: 'leNext', startTimer: 'leStartSpeech', extend: 'leExtend', skip: 'leSkip' };
+const LE_ACTIONS = { start: 'leIntroStart', skipIntro: 'leIntroSkip', next: 'leNext', startTimer: 'leStartSpeech', skip: 'leSkip' };
 
 // A ballot's options -> what /vote shows. People become cast ids (their faces and names are on the site); anything
 // else (a bot, FOR / AGAINST) gets an id of its own and its words in labels. map: vote option -> the game's option id.
@@ -169,14 +173,15 @@ function make(o) {
     if (!show || !saved || !live.checked || !origin || !db) return [];
     const seg = state && state.started ? segOf(cue) : 1;
     const want = seg <= 3 ? ['le'] : ['cv'];
+    // a game cue shows its game, Lesser Evil's ballots included (its own ballot screen has each candidate's position;
+    // the launcher's vote QR sits beside it)
     const showing = screenOf(cue) === 'game' ? gameOf(cue) : null;
-    const leVote = live.vote && live.vote.game === 'le' && live.vote.auto && live.vote.state !== 'closed';
     return want.map((g) => {
       const room = saved.rooms[g], made = saved.made[g];
       const url = g === 'le'
         ? `${origin}/lesser-evil-tv.html?${made ? 'game' : 'code'}=${encodeURIComponent(room)}`
         : `${origin}/tv.html?${made ? 'game=' + encodeURIComponent(room) : 'create=1&code=' + encodeURIComponent(room) + '&theme=classic'}`;
-      return { game: g, room, url, visible: showing === g && !(g === 'le' && leVote) };
+      return { game: g, room, url, visible: showing === g };
     });
   }
 
@@ -415,11 +420,19 @@ function make(o) {
     const v = live.vote;
     if (!v || v.state !== 'open') return { error: 'No vote is open' };
     v.state = 'closing'; changed();
-    const r = await run('vote-close', () => db.closeVote(v.id, REVEAL_MS));
+    const hold = v.game === 'cv' || v.game === 'le' ? GAME_REVEAL_MS : REVEAL_MS;
+    const r = await run('vote-close', () => db.closeVote(v.id, hold));
     if (!r || !r.ok) { v.state = 'open'; if (v.closesAt) v.closesAt = Date.now() + 2000; changed(); return { error: 'Couldn’t close the vote: ' + (live.db.err || 'try again') }; }
     v.result = r.result || {}; v.counts = v.result.counts || v.counts; v.total = v.result.total || 0;
-    v.state = 'closed'; v.revealAt = Date.now() + REVEAL_MS; v.closedBy = why; v.closedAt = Date.now();
-    changed();
+    v.state = 'closed'; v.revealAt = Date.now() + hold; v.closedBy = why; v.closedAt = Date.now();
+    changed(); feedAudience(v);   // the TV's "from the audience" ends on the final count
+    if (v.game === 'le') {
+      // closed early (V, or leaving the cue): stop the game's ballot clock where the room can see it. Only this
+      // ballot's clock (its seq), and only while it's still the ballot, so a write that lands late can't touch the next
+      o.runInEngine('le', `(function(){var h=window.LE_HOST;if(!h||!h.leWrite)return 0;h.leWrite('vl-close',function(s){`
+        + `if(!s||!s.stage||s.deadline==null||((s.game_no||0)*1000+(s.stage_idx||0))!==${+v.leSeq || 0})return null;`
+        + `if(!(s.stage.sub==='ballot'||s.stage.type==='room_vote'))return null;var n=Date.now();if(s.deadline<=n)return null;s.deadline=n;return s;});return 1;})()`).catch(() => {});
+    }
     if (v.game === 'cv' || v.game === 'le') {
       // the audience's counts ARE the tally: handed over as Vessels Live's hand count, keyed by the game's options
       const override = {};
@@ -433,12 +446,19 @@ function make(o) {
     if (!v || v.state !== 'open') return;
     const r = await run('vote-extend', () => db.extendVote(v.id, secs));
     if (r) { v.closesAt = Math.max(v.closesAt || Date.now(), Date.now()) + secs * 1000; changed(); }
+    // Lesser Evil's ballot clock is on the projector: move it too (the game has no host +30 s for a ballot, so the
+    // deadline is written through the TV's own guarded write)
+    if (r && v.game === 'le') o.runInEngine('le', `(function(){var h=window.LE_HOST;if(!h||!h.leWrite)return 0;`
+      + `h.leWrite('vl-extend',function(s){if(!s||s.deadline==null||!s.stage)return null;s.deadline+=${secs * 1000};return s;});return 1;})()`).catch(() => {});
   }
+  // Lesser Evil's own ballot screen says how many in the audience have voted: tell it (event patch le-tv:audience-count)
+  const feedAudience = (v) => { if (v && v.game === 'le') o.runInEngine('le', `window.__VL_EVENT&&(window.__VL_EVENT.audTotal=${+v.total || 0})`).catch(() => {}); };
   async function pollTally() {
     const v = live.vote;
     const r = await run('tally', () => db.tally(v.id));
     if (!r || live.vote !== v || v.state !== 'open') return;
     if (JSON.stringify(r.counts) !== JSON.stringify(v.counts) || r.total !== v.total) { v.counts = r.counts || {}; v.total = r.total || 0; changed(); }
+    feedAudience(v);
   }
   // Lesser Evil opens its own ballots. Each new one goes to /vote; once the game has taken a close, its command
   // is cleared so the next ballot can't close the moment it opens.
@@ -451,9 +471,14 @@ function make(o) {
       if (v && v.state === 'open') await closeVote('replaced');
       await run('le-reset', () => db.control(room, { cmd: 'open_vote', nonce: Date.now(), override: null, nominees: [] }));
       const m = mapOptions(b.options, live.players.le, show.cast);
-      const secs = (show.lesserEvil && show.lesserEvil.voteSecs) || LE_VOTE_SECS;
-      await openVote({ game: 'le', room, auto: true, leSeq: b.seq, prompt: b.prompt || 'Who made the best case?', pick: b.pick || 1,
+      // close on the ballot clock the room is watching on the projector (the TV runs on this laptop: same clock),
+      // else after voteSecs
+      const g = await run('le-deadline', () => db.game(room));
+      const dl = +(g && g.le && g.le.deadline) || 0;
+      const secs = dl - Date.now() > 5000 ? Math.round((dl - Date.now()) / 1000) : ((show.lesserEvil && show.lesserEvil.voteSecs) || LE_VOTE_SECS);
+      const opened = await openVote({ game: 'le', room, auto: true, leSeq: b.seq, prompt: b.prompt || 'Who made the best case?', pick: b.pick || 1,
         candidates: m.candidates, labels: m.labels, map: m.map, secs });
+      feedAudience(opened);
       log(`Lesser Evil ballot ${b.seq} mirrored to /vote (${m.candidates.length} options)`);
     } else if (v && v.game === 'le' && v.state === 'closed' && !v.ctlCleared && b && !b.open && b.seq === v.leSeq && (b.result || Date.now() - (v.closedAt || 0) > 8000)) {
       const r = await run('le-clear', () => db.control(room, { cmd: 'idle', nonce: Date.now(), override: null }));

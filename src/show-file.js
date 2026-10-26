@@ -11,7 +11,7 @@ const FORMAT = 'vessels-show/1';
 const SCREENS = ['black', 'menu-loop', 'title', 'card', 'checkin', 'practice-vote', 'game', 'vote', 'intermission', 'mvp', 'download'];
 const CODE_RE = /^[A-Z0-9-]{4,12}$/;
 // the game steps a cue may take on entry (Core Vessels' captain actions and Lesser Evil's host buttons, main/night.js)
-const ENGINE_STEPS = ['start', 'begin', 'next', 'continue', 'openvote', 'rematch', 'skipIntro', 'startTimer', 'extend', 'skip'];
+const ENGINE_STEPS = ['start', 'begin', 'next', 'continue', 'openvote', 'rematch', 'skipIntro', 'startTimer', 'skip'];
 const ID_RE = /^[a-z0-9][a-z0-9-]{2,39}$/;
 // a show without an id gets one from its name
 const slug = (obj) => (obj && obj.id) || String((obj && obj.name) || 'show').toLowerCase().normalize('NFKD')

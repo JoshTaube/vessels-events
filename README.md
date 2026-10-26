@@ -19,8 +19,10 @@ What Phase 2 does:
 - **The game panel** (top right) says what the game is waiting for; **N** takes that step. Core Vessels steps
   through `captain_action`; Lesser Evil through its own host buttons.
 - **The audience votes** at **vessels-events.netlify.app/vote** (the QR on screen). The practice vote and Core
-  Vessels' votes open on their cues; Lesser Evil opens its own ballots, which pop onto the projector and every
-  phone by themselves. The console sees live counts; the room sees only how many have voted. **V** closes a vote
+  Vessels' votes open on their cues; Lesser Evil opens its own ballots, which reach every phone by themselves.
+  During a Lesser Evil ballot the projector keeps the game's own ballot screen (each candidate's position and
+  slogan, its clock, how many in the audience have voted) with a vote QR panel beside it; the vote closes when that
+  clock runs out. The console sees live counts; the room sees only how many have voted. **V** closes a vote early
   (or it closes on its timer, or by leaving its cue). Everyone gets the result at the same moment, and the game
   takes the audience's count as its own.
 - **The prize**: Lesser Evil's winner picks their Vessels role on their phone (Demon allowed, never the Final
@@ -72,8 +74,9 @@ and the saved show somewhere else, `--offline` never touches the event database.
    counts it. GO on closes it and shows the result.
 4. GO to **301 Lesser Evil**. The cast phones jump into the race. Each types a campaign slogan; the game panel says
    *ready*. GO to **310 The race**: the race starts (after its intro) and is on the projector.
-5. Press **N** to move the race on. When a ballot opens it takes over the projector and every audience phone. Vote,
-   then **V** (or wait 30 s). The race carries on with the audience's count.
+5. Press **N** to move the race on. When a ballot opens, the projector shows the game's ballot (the positions) with
+   the vote QR beside it, and every audience phone gets the ballot. Vote, then **V** (or let the game's clock run
+   out; **5** adds 30 s to it). The race carries on with the audience's count.
 6. When the race crowns its winner, the console's game panel shows *Prize: X won Lesser Evil*; their phone offers
    the roles. Lock one in (or pick for them on the console). **390** shows the winner.
 7. Double-click **401 Intermission**: the Vessels TV opens its room and the cast phones follow into its lobby. GO to

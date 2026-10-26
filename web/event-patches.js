@@ -698,6 +698,73 @@ function vlRenderHold(){
       applied: 'VESSELS EVENTS: the cast join through /cast on the event site'
     }
   ];
+
+  // ===========================================================================
+  // VESSELS EVENTS (2026-10-26, Josh: "the projector should show the game like the TV display"): Lesser Evil's
+  // own screens stay on the projector through its ballots (each candidate's position and slogan, the clock), with
+  // the launcher's vote QR beside them. These make the TV's readouts true at an event, where the cast never vote and
+  // the audience votes on /vote (ev_ballot, not this game's le_votes):
+  //   - "from the audience" counts the /vote ballots: the launcher pushes the total into __VL_EVENT.audTotal
+  //   - the ballot's "Voters 0/3 · Still to vote: <cast>" line goes (nobody in the room votes)
+  //   - the room vote shows who's in it, not live bars of cast votes that never come, until the reveal
+  //   - the reveal says how many in the audience voted, and names the winner from the audience's count (stock
+  //     shows the winner only when the room cast ballots, so at an event it never did)
+  // ===========================================================================
+  const LE_EV_ON = '(window.__VL_EVENT && window.__VL_EVENT.on)';
+  LE_TV_EV.push(
+    {
+      name: 'le-tv:audience-count',
+      find: '  const a = window._leAud || { cast: 0, expected: 0, ok: false };',
+      replace: '  // VESSELS EVENTS: the audience votes on /vote; the launcher keeps __VL_EVENT.audTotal current\n'
+        + '  const a = (' + LE_EV_ON + ' && window.__VL_EVENT.audTotal != null) ? { cast: +window.__VL_EVENT.audTotal || 0, expected: 0, ok: true }\n'
+        + '    : (window._leAud || { cast: 0, expected: 0, ok: false });',
+      applied: 'VESSELS EVENTS: the audience votes on /vote; the launcher keeps __VL_EVENT.audTotal current'
+    },
+    {
+      name: 'le-tv:no-room-voters',
+      find: '  const tally = \'<div class="le-votebar">\'',
+      replace: '  // VESSELS EVENTS: nobody in the room votes, so no "Voters 0/3 · Still to vote" line; the audience count stays\n'
+        + '  const tally = ' + LE_EV_ON + ' ? (\'<div class="le-votebar">\' + audTallyLine() + \'</div>\') : \'<div class="le-votebar">\'',
+      applied: 'VESSELS EVENTS: nobody in the room votes, so no "Voters 0/3'
+    },
+    {
+      name: 'le-tv:room-vote-names',
+      find: "    tagFn: (id, i) => i < stage.pick ? { text: 'Advances', cls: 'lead' } : { text: 'Out', cls: 'safe' },",
+      replace: "    // VESSELS EVENTS: no live bars or Advances/Out tags from cast votes that never come; the reveal has the result\n"
+        + "    tagFn: (id, i) => " + LE_EV_ON + " ? null : (i < stage.pick ? { text: 'Advances', cls: 'lead' } : { text: 'Out', cls: 'safe' }),",
+      applied: 'VESSELS EVENTS: no live bars or Advances/Out tags from cast votes'
+    },
+    {
+      name: 'le-tv:room-vote-header',
+      find: "    + '<div class=\"le-bcast-sub\">' + cast + ' of ' + elig.length + ' ballots in &middot; top ' + stage.pick + ' voted back in</div>'\n"
+        + "    + '<div class=\"le-btally\">' + rows + '</div>'\n"
+        + "    + audTallyLine()",
+      replace: "    + (" + LE_EV_ON + " ? '<div class=\"le-bcast-sub\">The audience votes &middot; top ' + stage.pick + ' voted back in</div>'   // VESSELS EVENTS\n"
+        + "      : '<div class=\"le-bcast-sub\">' + cast + ' of ' + elig.length + ' ballots in &middot; top ' + stage.pick + ' voted back in</div>')\n"
+        + "    + '<div class=\"le-btally' + (" + LE_EV_ON + " ? ' vl-names' : '') + '\">' + rows + '</div>'\n"
+        + "    + audTallyLine()",
+      applied: "The audience votes &middot; top ' + stage.pick + ' voted back in</div>'   // VESSELS EVENTS"
+    },
+    {
+      name: 'le-tv:reveal-audience',
+      find: "    + '<div class=\"le-bcast-sub\">The verdict is in &middot; ' + counted + ' ballot' + (counted === 1 ? '' : 's') + ' in the room' + audLine + '</div>'\n"
+        + "    + '<div class=\"le-btally\">' + rows + '</div>'\n"
+        + "    + (counted > 0 ? (verdict + noTimeLine) : '');",
+      replace: "    + '<div class=\"le-bcast-sub\">The verdict is in &middot; ' + (" + LE_EV_ON + "   // VESSELS EVENTS: the audience is the vote\n"
+        + "        ? (audN + ' voter' + (audN === 1 ? '' : 's') + ' in the audience')\n"
+        + "        : (counted + ' ballot' + (counted === 1 ? '' : 's') + ' in the room' + audLine)) + '</div>'\n"
+        + "    + '<div class=\"le-btally\">' + rows + '</div>'\n"
+        + "    + ((counted > 0 || (" + LE_EV_ON + " && audN > 0)) ? (verdict + noTimeLine) : '');",
+      applied: '// VESSELS EVENTS: the audience is the vote'
+    },
+    {
+      // the room vote's name list (le-tv:room-vote-names) without its empty bars and 0% labels
+      name: 'le-tv:event-css',
+      find: '</head>',
+      replace: '<style>/* VESSELS EVENTS */ .le-btally.vl-names .le-btally-track, .le-btally.vl-names .le-btally-pct { visibility: hidden; }</style>\n</head>',
+      applied: '/* VESSELS EVENTS */ .le-btally.vl-names'
+    }
+  );
   LE_PLAYER.push(
     {
       name: 'le-player:cast-gate',

@@ -8,6 +8,7 @@
   const { esc, clock } = VesselsScreens;
   const send = (cmd) => window.vessels.send(cmd);
   let P = null, picker = null;   // the latest state; the open S4/S6 name picker
+  let lastErr = null;            // the last refusal, {text, at}
 
   const SEG = [['1', 'Preshow'], ['2', 'Welcome'], ['3', 'Lesser Evil'], ['4', 'Intermission'], ['5', 'Vessels'], ['6', 'Finale']];
   const ASSET = '../assets/vessels-wordmark.png';
@@ -82,7 +83,9 @@
     // GO: red when something stops it
     const blocked = (st.safety && st.safety.full) ? `Clear ${st.safety.full} first (Esc)` : n && n.lock ? 'Locked' : !n ? 'End of the show' : '';
     $('goBtn').classList.toggle('blocked', !!blocked);
-    if (p.error) { status(p.error, 'err'); }
+    // why GO (or N) was refused stays up for a few seconds: the games update the console several times a second
+    if (p.error) lastErr = { text: p.error, at: Date.now() };
+    if (lastErr && Date.now() - lastErr.at < 5000 && !(st.flash && st.flash.at > lastErr.at)) status(lastErr.text, 'err');
     else if (st.flash && p.now - st.flash.at < 4000) status(st.flash.text, 'ok');
     else status(blocked);
 

@@ -70,14 +70,13 @@
       <div class="voterow"><div class="faces n${Math.min(cands.length, 6)}">${cands.map(face).join('')}</div>${qr}</div>
       ${count}${clockEl}`);
   }
-  // Lesser Evil's own ballots (mirrored to /vote) take over the projector while they're open
-  const autoVote = (p) => { const lv = p.live && p.live.vote; return lv && lv.auto && lv.state !== 'closed' ? lv : null; };
+  // Lesser Evil's own ballots (mirrored to /vote): the game's ballot screen stays up (each candidate's position, its
+  // clock, its audience count) and the vote panel sits beside it, until the shared reveal time
+  const gameVote = (p) => { const lv = p.live && p.live.vote; return lv && lv.auto && (lv.state !== 'closed' || (lv.revealAt && p.now < lv.revealAt)) ? lv : null; };
 
   function screenHTML(p) {
     const show = p.show, v = p.view || {}, cue = v.current, st = p.state || {};
     if (!cue) return '<div class="scr black"></div>';   // standing by: the projector stays dark until the first GO
-    const av = autoVote(p);
-    if (av) return voteHTML(p, av, { le: av.game === 'le' });
     const sc = cue.screen || { type: 'black' }, r = { round: cue.round, game: st.games }, le = isLE(cue);
     const kicker = fill(sc.kicker, r), title = fill(sc.title != null ? sc.title : cue.title, r), sub = fill(sc.subtitle, r);
     const timer = st.timer ? `<div class="timer" data-timer>${clock(st.timer.start + st.timer.secs * 1000 - p.now)}</div>` : '';
@@ -159,8 +158,16 @@
   const BIG_QR = ['vote', 'practice-vote', 'download', 'black'];
   function cornerHTML(p) {
     const st = p.state || {}, cue = p.view && p.view.current, aud = p.show && p.show.audience;
-    if (!cue || st.qr === false || !aud || !aud.qr) return '';
-    if (BIG_QR.includes((cue.screen && cue.screen.type) || 'black') || autoVote(p)) return '';
+    if (!cue || !aud || !aud.qr) return '';
+    // a game's own ballot is up: the corner grows into the vote panel (whatever Q says: people need to vote)
+    const gv = gameVote(p);
+    if (gv) {
+      const open = gv.state === 'open', n = open ? gv.total || 0 : ((gv.result && gv.result.total) || gv.total || 0);
+      return `<div class="votepanel${gv.game === 'le' ? ' le' : ''}"><div class="vp-k">${open ? 'Vote now' : 'Voting closed'}</div>`
+        + `<div class="tile">${aud.qr}</div><div class="cap">Scan to vote</div>`
+        + `<div class="vp-n"><b>${n}</b> ${n === 1 ? 'vote' : 'votes'}${open ? ' in' : ''}</div></div>`;
+    }
+    if (st.qr === false || BIG_QR.includes((cue.screen && cue.screen.type) || 'black')) return '';
     return `<div class="cornerqr${isLE(cue) ? ' le' : ''}"><div class="tile">${aud.qr}</div><div class="cap">Scan to vote</div></div>`;
   }
   const shortUrl = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, '');

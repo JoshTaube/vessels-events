@@ -142,12 +142,21 @@ try {
   }
   ok('N steps the race to its first ballot, mirrored to /vote', leVote, await where());
   if (leVote) {
+    // the game's own ballot screen (positions, slogans, its clock) stays on the projector, the vote panel beside it
+    ok('the projector keeps the game’s own ballot screen up, with the vote panel beside it',
+      (await dis.$eval('body', (b) => b.classList.contains('gameon'))) && !!(await dis.$('#stage .votepanel .tile .qr')), await where());
+    const leFrame = dis.frames().find((f) => /lesser-evil-tv\.html/.test(f.url()));
+    const board = leFrame && await leFrame.evaluate(() => document.body.innerText.replace(/\s+/g, ' ')).catch(() => '');
+    ok('…which shows the candidates’ positions, and no cast "still to vote" line', /THE PEOPLE DECIDE/i.test(board || '') && !/Still to vote|Voters \d/i.test(board || ''), (board || '').slice(0, 160));
     await shot(dis, 'le-ballot');
     const opts = await waitFor(async () => { const ok_ = await fan.$eval('#vBallot', (e) => !e.classList.contains('hidden')); return ok_ ? fan.$$eval('#faces .face', (f) => f.map((x) => x.dataset.id)) : null; }, 12000);
     ok('/vote shows the Lesser Evil ballot in its colours', opts && (await fan.$eval('body', (b) => b.classList.contains('le'))), opts && opts.join(','));
     await shot(fan, 'vote-le');
     if (opts) { await fan.click(`[data-id="${opts[0]}"]`); await fan.click('#cast'); }
     ok('the console counts it', !!(await waitFor(async () => /1 in/.test(await text('#vTotal')), 8000)), await text('#vTotal'));
+    const aud = await waitFor(async () => { const t_ = leFrame && await leFrame.evaluate(() => (document.getElementById('leAudCount') || {}).textContent); return t_ === '1' ? t_ : null; }, 8000);
+    ok('the game’s own "from the audience" count follows /vote', !!aud, aud);
+    await shot(dis, 'le-ballot-voted');
     await key('v');
     const taken = await waitFor(async () => { const b = await db.leBallot(LE); return b && !b.open && b.result ? b : null; }, 15000, 1000);
     ok('V closes it and the race takes the audience’s count', !!taken && taken.result.source === 'override', taken && JSON.stringify(taken.result.counts));
@@ -164,8 +173,10 @@ try {
     if (open) {
       const opts = await waitFor(async () => { const up = await fan.$eval('#vBallot', (e) => !e.classList.contains('hidden')); return up ? fan.$$eval('#faces .face', (f) => f.map((x) => x.dataset.id)) : null; }, 8000);
       if (opts && opts.length) { await fan.click(`[data-id="${opts[k % opts.length]}"]`).catch(() => {}); await fan.click('#cast').catch(() => {}); await sleep(1500); }
+      await shot(dis, `le-ballot-${ballots + 1}`);
       await key('v'); ballots++;
-      await sleep(5500);
+      await sleep(1500); await shot(dis, `le-closed-${ballots}`);   // the game's clock stopped, the panel says closed
+      await sleep(5500); await shot(dis, `le-reveal-${ballots}`);   // the game's own reveal
       continue;
     }
     if (!(await stepN())) await sleep(1500);

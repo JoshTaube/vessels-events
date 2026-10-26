@@ -175,25 +175,37 @@ test('Lesser Evil: a ballot the game opens is mirrored to /vote; closing hands t
   const t = setup();
   await t.n._tick(); await t.n._tick();
   const room = t.n._saved().rooms.le;
-  t.db.games[room] = { id: room, phase: 'le', le: { phase: 'race', stage: { type: 'round', sub: 'ballot' } } };
+  // the game's ballot clock: 26 s left on the TV (it runs on this laptop, so the same clock)
+  t.db.games[room] = { id: room, phase: 'le', le: { phase: 'race', deadline: Date.now() + 26000, stage: { type: 'round', sub: 'ballot' } } };
   t.db.players[room] = [{ id: 'u1', name: 'Ava' }, { id: 'u2', name: 'cleo' }];
   await t.go('310');
   t.db.ballot = { seq: 1003, open: true, kind: 'vote', pick: 1, prompt: 'Who made the best case?', options: [{ id: 'u1', label: 'Ava' }, { id: 'u2', label: 'cleo' }] };
+  t.ran.length = 0;
   await t.n._tick();
   const reset = t.db.named('control').find((c) => c.cmd === 'open_vote');
   assert.equal(reset.room, room); assert.equal(reset.override, null);
   const v = t.db.named('openVote').pop();
-  assert.equal(v.game, 'le'); assert.deepEqual(v.candidates, ['ava', 'cleo']); assert.equal(v.secs, 20); assert.equal(v.labels, null);
+  assert.equal(v.game, 'le'); assert.deepEqual(v.candidates, ['ava', 'cleo']); assert.equal(v.labels, null);
+  assert.ok(v.secs >= 25 && v.secs <= 26, 'closes on the clock the room sees on the TV, not voteSecs: ' + v.secs);
   assert.equal(t.n._live.vote.auto, true);
-  assert.equal(t.n.engines(t.state, t.at('310'), 'http://x')[0].visible, false, 'the vote takes the projector while it’s open');
+  assert.equal(t.n.engines(t.state, t.at('310'), 'http://x')[0].visible, true, 'the game’s own ballot screen stays up (each position, its clock)');
+  assert.ok(t.ran.some(([g, js]) => g === 'le' && /audTotal=0/.test(js)), 'the TV’s audience count starts at 0');
+  t.db.counts = { ava: 2 };
   await t.n._tick();
   assert.equal(t.db.named('openVote').length, 1, 'the same ballot is mirrored once');
+  assert.ok(t.ran.some(([g, js]) => g === 'le' && /audTotal=2/.test(js)), 'and follows /vote');
+  // S5 moves the TV's ballot clock with the vote
+  await t.n.extendVote(30);
+  assert.ok(t.ran.some(([g, js]) => g === 'le' && /leWrite\('vl-extend'/.test(js) && /deadline\+=30000/.test(js)));
   // N during an open Lesser Evil vote closes it
   t.db.counts = { cleo: 4, ava: 4 };
   const r = await t.n.engineStep('le');
   assert.equal(r.ok, true);
   assert.deepEqual(t.db.named('control').find((c) => c.cmd === 'close_vote').override, { u1: 4, u2: 4 });
   assert.equal(t.n._live.vote.result.tied, true);
+  assert.ok(t.ran.some(([g, js]) => g === 'le' && /leWrite\('vl-close'/.test(js) && /!==1003\)/.test(js)), 'closing early stops this ballot’s clock on the TV');
+  const hold = t.n._live.vote.revealAt - t.n._live.vote.closedAt;
+  assert.ok(hold >= 5900 && hold <= 6100, 'phones and the panel reveal with the game, about 6 s after the close: ' + hold);
   t.db.ballot = Object.assign({}, t.db.ballot, { open: false, result: { counts: { u1: 4, u2: 4 } } });
   await t.n._tick();
   assert.ok(t.db.named('control').some((c) => c.cmd === 'idle' && c.override === null), 'the close is cleared once the game took it');
