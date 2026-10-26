@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld('vessels', {
   onState: (fn) => { ipcRenderer.on('state', (_e, s) => fn(s)); ipcRenderer.send('hello'); },
   // the console only: a small picture of the projector while a game is on it (null when none is)
   onThumb: (fn) => { ipcRenderer.on('thumb', (_e, url) => fn(url)); },
+  // the projector only: an earlier screen of the game shown again (Back), or null for the live game
+  onReplay: (fn) => { ipcRenderer.on('replay', (_e, url) => fn(url)); },
 });

@@ -711,6 +711,74 @@ function vlRenderHold(){
   //     shows the winner only when the room cast ballots, so at an event it never did)
   // ===========================================================================
   const LE_EV_ON = '(window.__VL_EVENT && window.__VL_EVENT.on)';
+
+  // ===========================================================================
+  // VESSELS EVENTS (2026-10-26): THE DIRECTOR for Lesser Evil. In event mode the race never changes screen by
+  // itself: a clock running out (a position pick, a speech, a throw, the kingmaker's choice) and the last player
+  // finishing their part (every position locked, both sudden-death teams set) leave the screen up, READY, until
+  // the launcher's Next (LE_HOST.hostActions.leNext, which already does the right thing for every screen). A
+  // speaker's phone no longer starts their own clock: the launcher does. The buzzer still sounds at 0.
+  // ===========================================================================
+  const LE_WIN_EV = "(typeof window !== 'undefined' && window.__VL_EVENT && window.__VL_EVENT.on)";
+  const LE_DIRECTOR = 'VESSELS EVENTS DIRECTOR';
+  LE_HOST.push(
+    {
+      name: 'le:director-rps',
+      find: '        if (_rpsFiredKey !== rk) {',
+      replace: '        if (_rpsFiredKey !== rk && !' + LE_WIN_EV + ') { // ' + LE_DIRECTOR + ': the launcher settles a silent throw',
+      applied: LE_DIRECTOR + ': the launcher settles a silent throw'
+    },
+    {
+      name: 'le:director-endorse',
+      find: "      if (le.deadline != null && Date.now() >= le.deadline) {\n        leWrite('endorse-expiry'",
+      replace: "      if (le.deadline != null && Date.now() >= le.deadline && !" + LE_WIN_EV + ") { // " + LE_DIRECTOR + ": the launcher calls the kingmaker's clock\n        leWrite('endorse-expiry'",
+      applied: LE_DIRECTOR + ": the launcher calls the kingmaker's clock"
+    },
+    {
+      name: 'le:director-pick',
+      find: "      if (deadlinePassed) {\n        leWrite('pickTopic-expiry'",
+      replace: "      if (deadlinePassed && !" + LE_WIN_EV + ") { // " + LE_DIRECTOR + ": the launcher ends the pick\n        leWrite('pickTopic-expiry'",
+      applied: LE_DIRECTOR + ': the launcher ends the pick'
+    },
+    {
+      name: 'le:director-speech',
+      find: '        if (_endFiredKey !== bk) {',
+      replace: '        if (_endFiredKey !== bk && !' + LE_WIN_EV + ') { // ' + LE_DIRECTOR + ': the buzzer sounds, the launcher ends the speech',
+      applied: LE_DIRECTOR + ': the buzzer sounds, the launcher ends the speech'
+    }
+  );
+  LE_ENGINE_P.push(
+    {
+      // the last position locked no longer starts the speeches; the host's pick (Next) does, filling any gaps
+      name: 'le-engine:director-pick',
+      find: "    if (stage.candidates.every(id => stage.picked[id] != null)) {\n      beginSpeechPhase(state, o);\n    }",
+      replace: "    if (stage.candidates.every(id => stage.picked[id] != null) && (fromId === undefined || !" + LE_WIN_EV + ")) { // " + LE_DIRECTOR + ": positions locked, the launcher starts the speeches\n      beginSpeechPhase(state, o);\n    }",
+      applied: LE_DIRECTOR + ': positions locked, the launcher starts the speeches'
+    },
+    {
+      // ...so the host's pick must still move on when every position was already locked by the players
+      name: 'le-engine:director-pick-ready',
+      find: "      if (!changed) return null;\n    } else {\n      if (!stage.candidates.includes(fromId)) return null;",
+      replace: "      if (!changed && !(" + LE_WIN_EV + " && stage.candidates.every(id => stage.picked[id] != null))) return null; // " + LE_DIRECTOR + ": a ready pick moves on\n    } else {\n      if (!stage.candidates.includes(fromId)) return null;",
+      applied: LE_DIRECTOR + ': a ready pick moves on'
+    },
+    {
+      // sudden death: both teams set their speakers; the launcher starts the speeches (the host's assign)
+      name: 'le-engine:director-assign',
+      find: "    if (!changed) return null;\n    if (stage.roles.for && stage.roles.against) {",
+      replace: "    if (!changed && !(" + LE_WIN_EV + " && fromId === undefined && stage.roles.for && stage.roles.against)) return null; // " + LE_DIRECTOR + ": a ready assign moves on\n"
+        + "    if (stage.roles.for && stage.roles.against && (fromId === undefined || !" + LE_WIN_EV + ")) {",
+      applied: LE_DIRECTOR + ': a ready assign moves on'
+    },
+    {
+      // a speaker's phone can't start their own clock at an event: the launcher does
+      name: 'le-engine:director-speech-start',
+      find: '    if (stage.speech.started) return null;',
+      replace: '    if (stage.speech.started) return null;\n    if (fromId !== undefined && ' + LE_WIN_EV + ') return null; // ' + LE_DIRECTOR + ': the launcher starts each speech',
+      applied: LE_DIRECTOR + ': the launcher starts each speech'
+    }
+  );
+
   LE_TV_EV.push(
     {
       name: 'le-tv:audience-count',
@@ -826,6 +894,71 @@ function vlRenderHold(){
       + '  const _dealWrite=async()=>{',
     applied: 'VESSELS EVENTS: the Lesser Evil winner\'s prize, their own pick of role'
   });
+
+  // ===========================================================================
+  // VESSELS EVENTS (2026-10-26, Josh: "we need more control"): THE DIRECTOR. In event mode Core Vessels never
+  // changes screen by itself: every place the autopilot still moved the room on is held until the launcher sends
+  // the step (games.captain_action 'next' or 'continue'). Players still play (they claim roles, act at night, name
+  // suspects); they just can't move the room on. Phase 2's tv:host-* patches already held the story, the role
+  // reveal, dawn, the day's opening, the discussion clock and the vote result.
+  // ===========================================================================
+  const EV_ON = '(window.__VL_EVENT&&window.__VL_EVENT.on)';
+  const TV_DIRECTOR = 'VESSELS EVENTS DIRECTOR';
+  TV.push(
+    {
+      // the floor (introductions and testimony) passes only when the launcher says so (apFloorAdvance(true))
+      name: 'tv:director-floor',
+      find: 'async function apFloorAdvance(forced){\n  const f=currentGame.floor;\n  if(!f||!f.playerId)return;',
+      replace: 'async function apFloorAdvance(forced){\n  const f=currentGame.floor;\n  if(!f||!f.playerId)return;\n'
+        + '  if(!forced&&' + EV_ON + ')return; // ' + TV_DIRECTOR + ': the launcher passes the floor',
+      applied: TV_DIRECTOR + ': the launcher passes the floor'
+    },
+    {
+      name: 'tv:director-intro-done',
+      find: "  if(ph==='intro' && !apIsDebate() && currentGame.floor && currentGame.floor.status==='complete'){",
+      replace: "  if(ph==='intro' && !apIsDebate() && currentGame.floor && currentGame.floor.status==='complete'){\n"
+        + "    if(" + EV_ON + "){ if(act!=='next'&&act!=='continue')return; try{ await sb.from('games').update({captain_action:null}).eq('id',gameId); if(currentGame)currentGame.captain_action=null; }catch(e){} } // " + TV_DIRECTOR + ": the launcher starts the night",
+      applied: TV_DIRECTOR + ': the launcher starts the night'
+    },
+    {
+      // night falls, and stays fallen until the launcher opens the action window
+      name: 'tv:director-night-window',
+      find: "    if(pt!=='window' && pt!=='night_done'){",
+      replace: "    if(pt!=='window' && pt!=='night_done'){\n"
+        + "      if(" + EV_ON + "){ // " + TV_DIRECTOR + ": the launcher opens the action window\n"
+        + "        if(act!=='continue')return;\n"
+        + "        _apBusy=true; try{ await sb.from('games').update({pending_action_type:'window',action_target:null,captain_action:null}).eq('id',gameId); if(currentGame)currentGame.captain_action=null; }catch(e){} _apBusy=false; return;\n"
+        + "      }",
+      applied: TV_DIRECTOR + ': the launcher opens the action window'
+    },
+    {
+      // the window's countdown no longer resolves the night by itself: the launcher does (Auto: when it runs out)
+      name: 'tv:director-night-resolve',
+      find: "    if(pt==='window'){ if(apIsDebate())dnScheduleBotNight(currentGame.night_number); else scheduleBotNightSubmits(currentGame.night_number); apMaybeResolveNight(); return; }",
+      replace: "    if(pt==='window'){ if(apIsDebate())dnScheduleBotNight(currentGame.night_number); else scheduleBotNightSubmits(currentGame.night_number);\n"
+        + "      if(" + EV_ON + "){ if(act==='continue'){ try{ await sb.from('games').update({captain_action:null}).eq('id',gameId); if(currentGame)currentGame.captain_action=null; }catch(e){} apResolveNight(); } return; } // " + TV_DIRECTOR + ": the launcher ends the night\n"
+        + "      apMaybeResolveNight(); return; }",
+      applied: TV_DIRECTOR + ': the launcher ends the night'
+    },
+    {
+      // a tied vote's coin lands and waits for the launcher (no backstop)
+      name: 'tv:director-coin',
+      find: "    if(landed&&(act==='coincontinue'||noCaptain||since>=B2.COIN.done+COIN_CONTINUE_BACKSTOP_MS)){",
+      replace: "    if(landed&&(act==='coincontinue'||(!" + EV_ON + "&&(noCaptain||since>=B2.COIN.done+COIN_CONTINUE_BACKSTOP_MS)))){ // " + TV_DIRECTOR + ": the launcher continues past the coin",
+      applied: TV_DIRECTOR + ': the launcher continues past the coin'
+    },
+    {
+      name: 'tv:director-verdict',
+      find: "  if(finalResultPending()){\n    const vk='apverdict:'+gameId+':'+currentGame.final_accusation_target;",
+      replace: "  if(finalResultPending()){\n"
+        + "    if(" + EV_ON + "){ // " + TV_DIRECTOR + ": the launcher reveals the Final Girl's verdict\n"
+        + "      if(act!=='continue')return;\n"
+        + "      _apBusy=true; try{ await sb.from('games').update({captain_action:null}).eq('id',gameId); if(currentGame)currentGame.captain_action=null; await apResolveFinalVerdict(); }catch(e){ console.error('verdict failed:',e); } _apBusy=false; return;\n"
+        + "    }\n"
+        + "    const vk='apverdict:'+gameId+':'+currentGame.final_accusation_target;",
+      applied: TV_DIRECTOR + ": the launcher reveals the Final Girl's verdict"
+    }
+  );
 
   // ===========================================================================
   // VESSELS EVENTS (2026-10-26, Josh): no Scholar on event nights. The Scholar's power is a second vote, and at an

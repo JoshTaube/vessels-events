@@ -27,7 +27,10 @@
       if (!f) {
         f = document.createElement('iframe');
         f.src = e.url;   // set once: the TV rewrites its own address, and a room must never be created twice
-        f.allow = 'autoplay; fullscreen';
+        // autoplay, but NOT fullscreen: a full-screen element sits in the browser's top layer, above everything the
+        // launcher draws (the safety cards, the vote screens, Back's pictures). The projector window is full screen
+        // already. (Core Vessels' TV asks for it when its game starts; found 2026-10-26.)
+        f.allow = 'autoplay';
         f.dataset.game = e.game;
         f.addEventListener('load', () => { f.dataset.ready = '1'; sync(); });
         box.appendChild(f);
@@ -48,6 +51,11 @@
     document.body.classList.toggle('preview', !p.onProjector);
     pv.classList.toggle('hidden', !!p.onProjector);
   });
+  // and if anything takes the page full screen anyway, take it back: the launcher's layers must stay on top
+  document.addEventListener('fullscreenchange', () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); });
+  // Back: an earlier screen of the game shown again; null returns to the live game
+  const rp = document.getElementById('replay');
+  window.vessels.onReplay((url) => { if (url) rp.src = url; else rp.removeAttribute('src'); document.body.classList.toggle('replaying', !!url); });
   setInterval(() => VesselsScreens.tick(stage), 250);
   addEventListener('keydown', (e) => {
     if (e.repeat) return;

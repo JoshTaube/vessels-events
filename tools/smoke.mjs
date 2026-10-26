@@ -105,15 +105,13 @@ try {
   await dis.screenshot({ path: path.join(SHOTS, 'display-310-lesser-evil.png') });
   await key('1'); await dis.screenshot({ path: path.join(SHOTS, 'display-s1-lesser-evil.png') }); await key('1');
 
-  // Core Vessels' nights loop; the branch box offers the way out
+  // offline, GO in a game cue moves the cue list (the Director needs the games online); Shift+Space does too
   await con.evaluate(() => { window.confirm = () => true; });   // the jump asks first
-  await (await con.$('[data-cue="570"]')).click({ clickCount: 2 }); await sleep(900);
-  const branch = await text(con, '#branch');
-  const branchUp = await con.$eval('#branch', (e) => !e.classList.contains('hidden'));
-  check('at the verdict GO offers another night', branchUp && /Next night · round 2/.test(branch), branch.replace(/\s+/g, ' '));
-  await con.screenshot({ path: path.join(SHOTS, 'console-loop.png') });
   await key('Space');
-  check('GO loops back to the next night', /Round 2/.test(await text(con, '#nowMeta')), await text(con, '#nowMeta'));
+  check('offline, GO in the race cue moves on to the next cue', (await text(con, '#nowId')) === '390', await text(con, '#nowTitle'));
+  await (await con.$('[data-cue="505"]')).click({ clickCount: 2 }); await sleep(900);
+  await con.keyboard.down('Shift'); await con.keyboard.press('Space'); await con.keyboard.up('Shift'); await sleep(750);
+  check('Shift+Space moves the cue list', (await text(con, '#nowId')) === '601', await text(con, '#nowTitle'));
 
   // jump to intermission: a 15 minute timer on the projector; S5 adds 30 s
   await con.evaluate(() => { window.confirm = () => true; });
@@ -144,7 +142,7 @@ try {
   check('in Lesser Evil the corner QR wears its colours', (await dis.$('#stage .cornerqr.le')) !== null);
   await dis.screenshot({ path: path.join(SHOTS, 'display-310-lesser-evil-qr.png') });
   await (await con.$('[data-cue="401"]')).click({ clickCount: 2 }); await sleep(900);
-  for (const [q, nm] of [['301', 'display-301-lesser-evil-title.png'], ['501', 'display-501-vessels-title.png'], ['560', 'display-560-vote.png']]) {
+  for (const [q, nm] of [['301', 'display-301-lesser-evil-title.png'], ['501', 'display-501-vessels-title.png'], ['505', 'display-505-vessels-game.png']]) {
     await (await con.$(`[data-cue="${q}"]`)).click({ clickCount: 2 }); await sleep(900); await dis.screenshot({ path: path.join(SHOTS, nm) });
   }
   check('Vessels cues use the Vessels look', (await dis.$('#stage .scr.le')) === null);

@@ -72,11 +72,16 @@
   }
   // Lesser Evil's own ballots (mirrored to /vote): the game's ballot screen stays up (each candidate's position, its
   // clock, its audience count) and the vote panel sits beside it, until the shared reveal time
-  const gameVote = (p) => { const lv = p.live && p.live.vote; return lv && lv.auto && (lv.state !== 'closed' || (lv.revealAt && p.now < lv.revealAt)) ? lv : null; };
+  const gameVote = (p) => { const lv = p.live && p.live.vote; return lv && lv.auto && lv.game === 'le' && (lv.state !== 'closed' || (lv.revealAt && p.now < lv.revealAt)) ? lv : null; };
+  // Core Vessels' audience vote (from the Director) covers its game until the reveal: the game's own vote screen is
+  // the room's checklist, which can't show an audience choosing between suspects. The verdict after it is the game's.
+  const cvVote = (p) => { const lv = p.live && p.live.vote; return lv && lv.auto && lv.game === 'cv' && (lv.state !== 'closed' || (lv.revealAt && p.now < lv.revealAt)) ? lv : null; };
 
   function screenHTML(p) {
     const show = p.show, v = p.view || {}, cue = v.current, st = p.state || {};
     if (!cue) return '<div class="scr black"></div>';   // standing by: the projector stays dark until the first GO
+    const cv = cvVote(p);
+    if (cv) return voteHTML(p, cv, { le: false });
     const sc = cue.screen || { type: 'black' }, r = { round: cue.round, game: st.games }, le = isLE(cue);
     const kicker = fill(sc.kicker, r), title = fill(sc.title != null ? sc.title : cue.title, r), sub = fill(sc.subtitle, r);
     const timer = st.timer ? `<div class="timer" data-timer>${clock(st.timer.start + st.timer.secs * 1000 - p.now)}</div>` : '';
@@ -167,7 +172,7 @@
         + `<div class="tile">${aud.qr}</div><div class="cap">Scan to vote</div>`
         + `<div class="vp-n"><b>${n}</b> ${n === 1 ? 'vote' : 'votes'}${open ? ' in' : ''}</div></div>`;
     }
-    if (st.qr === false || BIG_QR.includes((cue.screen && cue.screen.type) || 'black')) return '';
+    if (st.qr === false || BIG_QR.includes((cue.screen && cue.screen.type) || 'black') || cvVote(p)) return '';
     return `<div class="cornerqr${isLE(cue) ? ' le' : ''}"><div class="tile">${aud.qr}</div><div class="cap">Scan to vote</div></div>`;
   }
   const shortUrl = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, '');

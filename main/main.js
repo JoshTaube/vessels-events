@@ -113,7 +113,8 @@ function payload(forConsole, extra) {
   const cue = view && view.current;
   const live = night && show ? night.snapshot(state, cue, forConsole) : null;
   const engines = night && show ? night.engines(state, cue, web && web.origin) : [];
-  const base = { now, show: withUrls, state, view, safety: Engine.SAFETY, onProjector: !!projector, live, engines };
+  const replay = replayAt >= 0 && shots[replayAt] ? { title: shots[replayAt].title, back: shots.length - 1 - replayAt } : null;
+  const base = { now, show: withUrls, state, view, safety: Engine.SAFETY, onProjector: !!projector, live, engines, replay };
   if (!forConsole) return base;
   const all = screen.getAllDisplays(), primaryId = screen.getPrimaryDisplay().id;
   return Object.assign(base, extra || {}, {
@@ -135,6 +136,7 @@ function broadcast(extra) {
     if (displayWin.webContents.isAudioMuted() === loud) displayWin.webContents.setAudioMuted(!loud);
     thumbs(p.engines.some((e) => e.visible));
   }
+  pictureLoop();
 }
 // the night changes often (polls); coalesce into one update
 const broadcastSoon = () => { if (!broadcast.soon) broadcast.soon = setTimeout(() => broadcast(), 60); };
@@ -151,6 +153,57 @@ function thumbs(on) {
   thumbs.t = setInterval(snap, 1000); snap();
 }
 const sendThumb = (url) => { if (consoleWin && !consoleWin.isDestroyed()) consoleWin.webContents.send('thumb', url); };
+
+// BACK in a game (the Director): the projector shows an earlier screen again, as it looked, without touching the game.
+// While a game cue plays, the projector is pictured every 1.5 s into the current screen's slot (night.js tells us
+// when a new screen starts: onScreen). Back steps through them; Space or Esc returns to the live game.
+const shots = [];   // [{key, title, img, pics}] oldest first; the last is the screen on now
+let replayAt = -1;  // which one the projector is showing again (-1: live)
+// A new screen: the one before it keeps its last picture taken before it ended (cutAt: the GO that ended it, or a
+// beat before the launcher noticed, since the game changes screen up to a second before the launcher reads it).
+function onScreen(s, cutAt) {
+  if (shots.length && shots[shots.length - 1].key === s.key) return;
+  const prev = shots[shots.length - 1];
+  if (prev && prev.pics) {
+    const before = prev.pics.filter((p) => p.at < cutAt);
+    prev.img = (before.length ? before[before.length - 1] : prev.pics[0] || {}).img || null;
+    prev.pics = null;
+  }
+  shots.push({ key: s.key, title: s.title, img: null, pics: [] });
+  if (shots.length > 30) shots.shift();
+}
+function pictureLoop() {
+  const on = !!(night && show && state && night.directorOn(curCue()));
+  if (!on) { if (pictureLoop.t) { clearInterval(pictureLoop.t); pictureLoop.t = null; } shots.length = 0; if (replayAt >= 0) replayLive(); return; }
+  if (pictureLoop.t) return;
+  pictureLoop.t = setInterval(() => {
+    if (replayAt >= 0 || !shots.length || !displayWin || displayWin.isDestroyed()) return;   // never picture a replay
+    const slot = shots[shots.length - 1], at = Date.now();
+    displayWin.webContents.capturePage().then((img) => {
+      if (img.isEmpty() || replayAt >= 0 || !slot.pics) return;
+      const sz = img.getSize();
+      slot.pics.push({ at, img: 'data:image/jpeg;base64,' + (sz.width > 1920 ? img.resize({ width: 1920 }) : img).toJPEG(82).toString('base64') });
+      if (slot.pics.length > 4) slot.pics.shift();
+    }, () => {});
+  }, 1500);
+}
+function replayBack() {
+  // the screens before the live one that have a picture, newest first
+  const earlier = shots.slice(0, -1).map((s, i) => i).filter((i) => shots[i].img).reverse();
+  if (!earlier.length) return { error: 'No earlier screen to show yet' };
+  const next = replayAt < 0 ? earlier[0] : earlier.find((i) => i < replayAt);
+  if (next == null) return { error: 'That’s the first screen of this game' };
+  replayAt = next;
+  if (displayWin && !displayWin.isDestroyed()) displayWin.webContents.send('replay', shots[next].img);
+  broadcast();
+  return { ok: true, flash: 'Showing again: ' + shots[next].title };
+}
+function replayLive() {
+  replayAt = -1;
+  if (displayWin && !displayWin.isDestroyed()) displayWin.webContents.send('replay', null);
+  broadcast();
+  return { ok: true, flash: 'Back to the live game' };
+}
 
 // Run a line of JavaScript inside one of the game TVs the display hosts (Lesser Evil's host buttons).
 function engineFrame(game) {
@@ -269,7 +322,36 @@ async function command(cmd, fromConsole) {
       if (r.response !== 1) return { ok: false };
       return act({ type: 'reset' });
     }
-    // the night: N (a game step), the Core Vessels shortlist, closing a vote now, picking the prize for its winner
+    // GO. In a game cue it plays the game (the Director): the game's next screen; once the game is done there, the
+    // next cue. {cue: true} (Shift+Space) always moves the cue list. While an earlier screen is showing again, GO
+    // first returns to the live game.
+    case 'go': {
+      if (replayAt >= 0) return replayLive();
+      if (!cmd.cue && night && show && state && night.directorOn(curCue())) {
+        const r = await night.directorGo('operator');
+        if (!r.cue) {
+          if (r.ok && r.flash) state.flash = { text: r.flash, at: Date.now() };
+          broadcast(r.error ? { error: r.error } : undefined);
+          return r;
+        }
+      }
+      return act({ type: 'go' });
+    }
+    // the Director's mode (A), Hold (H), Back (Shift+Backspace in a game) and back to live
+    case 'director-mode': case 'director-hold': case 'replay-back': case 'replay-live': {
+      if (!fromConsole) return { error: 'console only' };
+      if (!night || !show) return { error: 'Offline: the games need the event database' };
+      let r;
+      if (cmd.type === 'director-mode') r = night.setDirMode(cmd.mode);
+      else if (cmd.type === 'director-hold') r = night.holdDir();
+      else if (cmd.type === 'replay-back') r = replayBack();
+      else r = replayLive();
+      if (r && r.ok && r.flash) state.flash = { text: r.flash, at: Date.now() };
+      broadcast(r && r.error ? { error: r.error } : undefined);
+      return r;
+    }
+    // the night: a game step (the game panel's extra buttons), the Core Vessels shortlist, closing a vote now,
+    // picking the prize for its winner
     case 'engine': case 'nominee': case 'vote-close': case 'prize-pick': {
       if (!fromConsole) return { error: 'console only' };
       if (!night || !show) return { error: 'Offline: the games need the event database' };
@@ -302,7 +384,7 @@ app.whenReady().then(async () => {
   if (cfg) {
     if (!fs.existsSync(path.join(SITE, 'tv.html'))) siteProblem = 'The event build is missing (web/_site): run web\\deploy.ps1 once, then restart. The games can’t load until then.';
     try { web = await Server.start([SITE, PROD]); } catch (e) { siteProblem = 'The games’ web server didn’t start: ' + e.message; }
-    night = Night.make({ db: EV.make(cfg), EV, store, act: (a) => act(a), onChange: broadcastSoon, runInEngine,
+    night = Night.make({ db: EV.make(cfg), EV, store, act: (a) => act(a), onChange: broadcastSoon, runInEngine, onScreen,
       log: (m) => console.log('[night] ' + m) });
   }
   makeConsole();

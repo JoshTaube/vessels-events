@@ -5,6 +5,7 @@
 'use strict';
 
 const path = require('path');
+const DIRECTOR_TIMES = require('../main/director.js').TIMES;   // the times Auto uses (director.times overrides them)
 const fs = require('fs');
 
 const FORMAT = 'vessels-show/1';
@@ -104,6 +105,19 @@ function check(obj, dir, exists) {
   });
   ((obj.music && obj.music.stingers) || []).forEach((t, n) => { if (t && t.file && !exists(file(t.file))) warn(`Stinger #${n + 1}: file not found at ${t.file}.`); });
   if (obj.media && obj.media.menuLoop && !exists(file(obj.media.menuLoop))) warn(`Menu loop not found at ${obj.media.menuLoop} (the built-in loop will play).`);
+  // the Director: how the games are played (Manual / Auto) and Auto's times per kind of screen, in seconds
+  const d = obj.director;
+  if (d != null) {
+    if (typeof d !== 'object') err('"director" is an object: {"mode": "manual" or "auto", "times": {...}}.');
+    else {
+      if (d.mode != null && !['manual', 'auto'].includes(d.mode)) err('"director.mode" is "manual" or "auto".');
+      const known = Object.keys(DIRECTOR_TIMES);
+      Object.entries(d.times || {}).forEach(([k, v]) => {
+        if (!known.includes(k)) warn(`"director.times.${k}" isn't a time the Director uses (${known.join(', ')}).`);
+        else if (!(typeof v === 'number' && v >= 0 && v <= 600)) err(`"director.times.${k}" is seconds, 0 to 600.`);
+      });
+    }
+  }
   // the audience's link (the QR in the corner and on the vote screens)
   const aud = obj.audience && obj.audience.url;
   if (aud != null && !/^https:\/\/[^\s/]+\.[^\s]+$/.test(String(aud))) err('"audience.url" must be a full https:// link.');

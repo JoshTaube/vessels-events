@@ -4,7 +4,7 @@ The desktop show launcher for live Vessels nights (Dojo Disco). The operator run
 laptop screen, the audience display full screen on the projector. The plan for every phase is in
 [docs/launcher-plan.md](docs/launcher-plan.md).
 
-**Status: Phase 2** (the games, the cast phones and the audience vote), on top of Phase 1 (two windows, projector
+**Status: Phase 2 with the Director** (the games, played by the launcher; the cast phones; the audience vote), on top of Phase 1 (two windows, projector
 detection, show files, the cue engine with GO, loops, locks and safety cues). Music, the Stream Deck, the host's
 phone page and the load test come in Phases 3 to 5.
 
@@ -16,10 +16,17 @@ What Phase 2 does:
 - **Cast phones**: each cast member enters their private code at **vessels-events.netlify.app/cast**. Their seat
   lights on the console. When the show reaches a game, every cast phone moves into that room and takes its seat under
   the cast member's exact name, no typing. A reload or a new phone gets the same seat back.
-- **The game panel** (top right) says what the game is waiting for; **N** takes that step. Core Vessels steps
-  through `captain_action`; Lesser Evil through its own host buttons.
-- **The audience votes** at **vessels-events.netlify.app/vote** (the QR on screen). The practice vote and Core
-  Vessels' votes open on their cues; Lesser Evil opens its own ballots, which reach every phone by themselves.
+- **The launcher plays the games (the Director).** Neither game changes screen by itself: not when a clock runs
+  out, not when the players finish their part. In a game cue **Space** moves the game to its next screen (start
+  the race, start Ava's clock, open the night, reveal the dawn...); the game panel shows what's on screen, whether
+  it's ready, its clock, what Space does next and the screens so far. **A** switches Manual (everything waits for
+  Space) and Auto (each screen moves on once it's ready and has been up for its time; Auto never starts a game,
+  ends one, or picks suspects). **H** holds Auto on a screen. **Shift+Backspace** shows the previous screen on the
+  projector again (Space or Esc returns to the live game). **Shift+Space** moves the cue list at any time; when a
+  game is over, Space does too.
+- **The audience votes** at **vessels-events.netlify.app/vote** (the QR on screen). The practice vote opens on its
+  cue; Core Vessels' vote opens from the day's discussion (pick 2 or 3 suspects, then Space) and its vote screen
+  covers the game until the verdict; Lesser Evil opens its own ballots, which reach every phone by themselves.
   During a Lesser Evil ballot the projector keeps the game's own ballot screen (each candidate's position and
   slogan, its clock, how many in the audience have voted) with a vote QR panel beside it; the vote closes when that
   clock runs out. The console sees live counts; the room sees only how many have voted. **V** closes a vote early
@@ -73,16 +80,18 @@ and the saved show somewhere else, `--offline` never touches the event database.
 3. GO through the welcome to **230 Practice vote**. On another phone scan the QR (or open /vote): vote. The console
    counts it. GO on closes it and shows the result.
 4. GO to **301 Lesser Evil**. The cast phones jump into the race. Each types a campaign slogan; the game panel says
-   *ready*. GO to **310 The race**: the race starts (after its intro) and is on the projector.
-5. Press **N** to move the race on. When a ballot opens, the projector shows the game's ballot (the positions) with
-   the vote QR beside it, and every audience phone gets the ballot. Vote, then **V** (or let the game's clock run
-   out; **5** adds 30 s to it). The race carries on with the audience's count.
-6. When the race crowns its winner, the console's game panel shows *Prize: X won Lesser Evil*; their phone offers
-   the roles. Lock one in (or pick for them on the console). **390** shows the winner.
+   *Ready*. GO to **310 The race**: the race's lobby is on the projector.
+5. Keep pressing **Space**: it plays the intro (Space again skips it), shows the line-ups, starts each debate, each
+   speaker's clock, ends each speech. Nothing moves until you press it (a speech whose clock runs out waits, Ready).
+   When a ballot opens, the projector shows the game's ballot (the positions) with the vote QR beside it, and every
+   audience phone gets the ballot. Vote, then Space or **V** (or let the game's clock run out; **5** adds 30 s).
+6. When the race crowns its winner, the game panel shows *Prize: X won Lesser Evil*; their phone offers the roles.
+   Lock one in (or pick for them on the console). Space at the results moves on to **390**, which shows the winner.
 7. Double-click **401 Intermission**: the Vessels TV opens its room and the cast phones follow into its lobby. GO to
-   **505 Roles dealt**: the game starts and the winner gets the role they picked. **N** steps the game (next speaker,
-   dawn, discussion...). In the day's discussion pick 2 or 3 suspects on the console, then GO to **560**: the
-   audience votes them; **V** closes it and the game eliminates the audience's pick.
+   **505 The game**, press **A** for Auto and Space to deal. Auto plays the game screen by screen (the story, the
+   reveal, each introduction, the night, the dawn, the testimony) and stops at the discussion: pick 2 or 3 suspects
+   on the console and press Space. The audience votes; the vote closes on its clock and the game eliminates their
+   pick. **H** holds Auto on a screen; **Shift+Backspace** shows the previous screen again; **A** back to Manual.
 8. **610** shows the MVP once a game of Vessels has ended.
 
 ## Tests
@@ -94,8 +103,9 @@ npm run check:phones     # the live site: /cast check-in, follow into a room, /v
 npm run check:night      # the whole night online: the real launcher, the event database, phones on the live site
 ```
 
-`check:night` plays the practice vote, a full Lesser Evil race (with a ballot each round), the prize pick, and
-Vessels up to its first audience vote. It takes several minutes. Screenshots land in `screenshots/night-*.png`.
+`check:night` plays the night the way the operator does: the practice vote, a full Lesser Evil race with Space
+alone on Manual (checking nothing moves on its own), the prize pick, then Core Vessels on Auto up to and through its
+first audience vote, with Hold and Back. It takes several minutes. Screenshots land in `screenshots/night-*.png`.
 The smoke test always uses a throwaway data folder and `--display=none`, so it never takes over a second monitor.
 
 ## Show files
@@ -106,12 +116,18 @@ Evil prompts, the music bank, the media, the cue list. Paths are relative to the
 entry, e.g. `"start"` on each game's first cue) and `cast` (`"le"`, `"cv"` or `"none"`: where the cast phones go,
 otherwise decided by the segment). `lesserEvil.prompts` replace the game's own topics bank by bank;
 `lesserEvil.voteSecs` is how long each Lesser Evil ballot stays open (30). A `title` screen with `"winner": "le"`
-shows Lesser Evil's champion.
+shows Lesser Evil's champion. `director` sets how the games are played: `"mode": "manual"` or `"auto"` to start
+the night in, and `"times"`: the seconds Auto gives each kind of screen (`read`, `podium`, `pickHold`, `grace`,
+`story`, `rolesHold`, `rolesMax`, `introHold`, `introMax`, `nightfall`, `windowMax`, `nightDone`, `dawn`,
+`testimonyHold`, `testimonyMax`, `coin`, `verdict`, and `vote`, how long Core Vessels' audience vote stays open).
+Defaults are in `main/director.js`.
 
 ## Where things are
 
-- `main/`: Electron main process (windows, projector, saving, commands), `night.js` (the online side: rooms,
-  check-in, the engines, votes, the prize, the MVP), `server.js` (the TVs' web server), `ev.js` (the event database)
+- `main/`: Electron main process (windows, projector, saving, commands, the replay pictures), `night.js` (the
+  online side: rooms, check-in, the engines, votes, the prize, the MVP, Manual / Auto), `director.js` (each game's
+  screens: what's on, whether it's ready, what GO does, when Auto moves on), `server.js` (the TVs' web server),
+  `ev.js` (the event database)
 - `src/`: the cue engine and the show file loader (no Electron, unit-tested)
 - `renderer/`: the console, the audience display, the shared Vessels look and screens, bundled fonts and logos
 - `web/`: the event site build (`build-event.js` generates it from production, `event-patches.js` are the anchored

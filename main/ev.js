@@ -60,7 +60,7 @@ function make(cfg, opts) {
     captain: (room, action) => call('/rest/v1/games?id=eq.' + encodeURIComponent(room), { method: 'PATCH',
       headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ captain_action: action }) }),
     game: (room) => call('/rest/v1/games?id=eq.' + encodeURIComponent(room)
-      + '&select=id,phase,mode,night_number,round_number,pending_action_type,voting_open,floor,captain_action,winner,final_accusation_active,score_log,last_elimination,le')
+      + '&select=id,phase,mode,night_number,round_number,pending_action_type,voting_open,floor,captain_action,winner,final_accusation_active,final_accusation_target,score_log,last_elimination,coin_flip,votes,le')
       .then((r) => (r && r[0]) || null),
     players: (room) => call('/rest/v1/players?game_id=eq.' + encodeURIComponent(room)
       + '&select=id,name,is_bot,is_eliminated,role,is_possessed,is_final_girl,has_revealed_once,last_seen,joined_at,le&order=joined_at.asc'),

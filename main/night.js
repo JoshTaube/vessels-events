@@ -6,10 +6,13 @@
 //   check-in    the cast phones' check-ins and heartbeats, from the event database, onto the board
 //   the cast    which room the cast phones belong in (they follow on their own): Lesser Evil in the 300s, Vessels
 //               from the intermission on, only once that room exists
-//   the engine  what each game is waiting for and the one step that moves it on (N on the console). Core Vessels
-//               takes steps through games.captain_action (Vessels Live's path); Lesser Evil through the host
-//               buttons its own TV exposes (LE_HOST.hostActions), run inside the TV page
-//   votes       the audience votes on /vote (ev_vote). The practice vote and Core Vessels' votes open on their cues;
+//   the engine  THE DIRECTOR (main/director.js): during a game cue, which screen the game is on and when it moves
+//               on. Neither game changes screen by itself in event mode (event patches); GO moves it, or Auto does
+//               once the screen is ready and has been up for its time. Core Vessels takes steps through
+//               games.captain_action (Vessels Live's path); Lesser Evil through the host buttons its own TV exposes
+//               (LE_HOST.hostActions), run inside the TV page
+//   votes       the audience votes on /vote (ev_vote). The practice vote opens on its cue, Core Vessels' from the
+//               Director (GO at the day's discussion, with the suspects picked on the console);
 //               Lesser Evil opens its own ballots, which are mirrored to /vote as they appear. Closing freezes the
 //               count, stamps a shared reveal time and hands the counts to the game as Vessels Live's hand count
 //               (event_control close_vote + override), so the game resolves exactly as if the room had voted.
@@ -21,6 +24,7 @@ const path = require('path');
 require(path.join(__dirname, '..', 'web', 'event-mode.js'));
 require(path.join(__dirname, '..', 'web', 'audience-bridge.js'));
 const VLE = globalThis.VLE;
+const Director = require('./director.js');
 
 const TICK_MS = 500;
 const REVEAL_MS = 4000;      // phones and the projector flip to the result this long after a close (the practice vote)
@@ -108,6 +112,9 @@ function make(o) {
     phones: {}, games: { le: null, cv: null }, players: { le: [], cv: [] }, ballot: { le: null },
     vote: null, nominees: [], written: null,
   };
+  // the Director: the screen the game is on, since when, since when it's been ready, the screens played so far
+  const dir = { key: null, screen: null, since: 0, readySince: null, history: [], held: false, going: false, lastGo: null, starting: 0 };
+  const resetDir = () => Object.assign(dir, { key: null, screen: null, since: 0, readySince: null, history: [], held: false, going: false, lastGo: null, starting: 0 });
   const at = {};   // when each poll last ran
   // o.manual (the tests): no timer, every poll due on every _tick()
   const due = (k, ms) => { if (o.manual) return true; const now = Date.now(); if (now - (at[k] || 0) < ms) return false; at[k] = now; return true; };
@@ -136,6 +143,7 @@ function make(o) {
       : { show: sh.id, rooms: freshRooms(), made: { le: false, cv: false }, registered: false, redoN: 0, redoAt: 0, voted: false };
     live.checked = false; live.vote = null; live.nominees = []; live.written = null;
     live.games = { le: null, cv: null }; live.players = { le: [], cv: [] }; live.ballot = { le: null };
+    resetDir();
     persist();
     if (o.manual) return;
     if (!timer) timer = setInterval(tick, TICK_MS);
@@ -143,7 +151,8 @@ function make(o) {
   }
   function reset() {   // start the show over: fresh rooms (the old games stay as they were), registered again
     if (!show) return;
-    saved = { show: show.id, rooms: freshRooms(), made: { le: false, cv: false }, registered: false, redoN: saved.redoN || 0, redoAt: Date.now(), voted: false };
+    saved = { show: show.id, rooms: freshRooms(), made: { le: false, cv: false }, registered: false, redoN: saved.redoN || 0, redoAt: Date.now(), voted: false, dirMode: saved.dirMode };
+    resetDir();
     live.checked = false; live.vote = null; live.nominees = []; live.written = null; live.phones = {}; live.prize = null;
     live.games = { le: null, cv: null }; live.players = { le: [], cv: [] }; live.ballot = { le: null };
     persist(); changed();
@@ -176,12 +185,15 @@ function make(o) {
     // a game cue shows its game, Lesser Evil's ballots included (its own ballot screen has each candidate's position;
     // the launcher's vote QR sits beside it)
     const showing = screenOf(cue) === 'game' ? gameOf(cue) : null;
+    // ...except Core Vessels' audience vote: the game's own vote screen is the room's checklist, so the launcher's
+    // vote screen covers it until the reveal
+    const cvVote = live.vote && live.vote.game === 'cv' && live.vote.auto && (live.vote.state !== 'closed' || Date.now() < (live.vote.revealAt || 0));
     return want.map((g) => {
       const room = saved.rooms[g], made = saved.made[g];
       const url = g === 'le'
         ? `${origin}/lesser-evil-tv.html?${made ? 'game' : 'code'}=${encodeURIComponent(room)}`
         : `${origin}/tv.html?${made ? 'game=' + encodeURIComponent(room) : 'create=1&code=' + encodeURIComponent(room) + '&theme=classic'}`;
-      return { game: g, room, url, visible: showing === g };
+      return { game: g, room, url, visible: showing === g && !(g === 'cv' && cvVote) };
     });
   }
 
@@ -198,7 +210,7 @@ function make(o) {
     const active = seg <= 3 ? 'le' : 'cv';
     const jobs = [];   // side by side; each kind of call is one at a time (run), so overlapping ticks never double up
     if (due('cast', 2500)) jobs.push(pollCast());
-    if (due('game', 1500)) jobs.push(pollGame(active));
+    if (due('game', 1000)) jobs.push(pollGame(active));
     if (active === 'le' && saved.made.le && due('ballot', 1200)) jobs.push(pollLeBallot());
     if (live.vote && live.vote.state === 'open') {
       if (due('tally', 1000)) jobs.push(pollTally());
@@ -207,6 +219,7 @@ function make(o) {
     await Promise.all(jobs);
     // then, on what the polls just learned (a room that has just opened): where the phones go, S6, the prize
     await Promise.all([writeLive(state, cue), redo(state), prize()]);
+    await direct(cue);
   }
 
   async function pollCast() {
@@ -352,6 +365,68 @@ function make(o) {
   }
 
   // ---------------------------------------------------------------------------------------------
+  // THE DIRECTOR. During a game cue: read the game's screen, keep the track, and on Auto take GO when it's time.
+  const times = () => Object.assign({}, Director.TIMES, (show && show.director && show.director.times) || {});
+  const dirMode = () => (saved && saved.dirMode) || (show && show.director && show.director.mode) || 'manual';
+  const directing = (cue) => !!(cue && screenOf(cue) === 'game' && gameOf(cue));
+  function readScreen(g) {
+    const starting = g === 'le' && dir.starting && Date.now() - dir.starting < 120000 && !(live.games.le && live.games.le.le);
+    return Director.screen(g, live.games[g], live.players[g], live.vote, { now: Date.now(), nominees: live.nominees, starting });
+  }
+  async function direct(cue) {
+    if (!directing(cue)) { if (dir.key) { dir.key = null; dir.screen = null; changed(); } return; }
+    const g = gameOf(cue), s = readScreen(g), now = Date.now();
+    if (s.key !== dir.key) {
+      if (dir.screen) { dir.history.push({ key: dir.key, title: dir.screen.title, at: dir.since }); if (dir.history.length > 40) dir.history.shift(); }
+      // the screen before this one ended at the GO that ended it, or (the game moved itself on, or Auto's GO is
+      // older) a beat before now: the game changes screen up to a second before the next poll reads it
+      const cutAt = dir.lastGo && now - dir.lastGo.at < 5000 ? dir.lastGo.at : now - 1600;
+      Object.assign(dir, { key: s.key, screen: s, since: now, readySince: s.ready ? now : null });
+      try { if (o.onScreen) o.onScreen(s, cutAt); } catch (e) { /* the replay pictures are a nicety */ }
+      changed();
+    } else {
+      if (s.ready && !dir.readySince) dir.readySince = now;
+      if (!s.ready) dir.readySince = null;
+      if (JSON.stringify(s) !== JSON.stringify(dir.screen)) { dir.screen = s; changed(); }
+    }
+    // Auto (quiet while the game is still taking its last step)
+    const taking = dir.lastGo && dir.lastGo.key === s.key && now - dir.lastGo.at < 4000;
+    if (dirMode() === 'auto' && !dir.held && !dir.going && !taking) {
+      const at = Director.autoAt(s, dir.since, dir.readySince, times());
+      if (at != null && now >= at) { const r = await directorGo('auto'); if (r && r.error) log('auto: ' + r.error); }
+    }
+  }
+  // GO during a game cue: the game's next screen. {cue: true} = the game is done here: GO moves the cue list instead.
+  async function directorGo(by) {
+    const { cue } = lastCtx;
+    if (!directing(cue) || !db) return { cue: true };
+    const g = gameOf(cue), s = readScreen(g);
+    if (s.go && s.go.action === 'cue') return { cue: true };
+    if (!s.go) return { error: s.why || 'Nothing to move on yet' };
+    if (s.blocked) return { error: s.blocked };
+    // a second GO before the game has taken the first (the screen hasn't changed yet) is ignored
+    if (dir.lastGo && dir.lastGo.key === s.key && Date.now() - dir.lastGo.at < 4000) return { error: 'The game is taking that step' };
+    dir.going = true;
+    try {
+      let r;
+      if (s.go.action === 'vote-close') r = await closeVote(by === 'auto' ? 'time' : 'operator');
+      else if (s.go.action === 'vote-open') r = await openCvVote({});
+      else r = await engineStep(g, s.go.action);
+      if (r && r.ok) {
+        dir.lastGo = { key: s.key, at: Date.now() };
+        if (g === 'le' && s.go.action === 'start') dir.starting = Date.now();
+        return Object.assign({}, r, { flash: s.go.label });
+      }
+      return r || { error: 'Couldn’t reach the game' };
+    } finally { dir.going = false; changed(); }
+  }
+  function setDirMode(m) {
+    saved.dirMode = m === 'auto' ? 'auto' : 'manual'; dir.held = false; persist(); changed();
+    return { ok: true, flash: saved.dirMode === 'auto' ? 'Auto: the game moves on by itself' : 'Manual: the game waits for GO' };
+  }
+  function holdDir() { dir.held = !dir.held; changed(); return { ok: true, flash: dir.held ? 'Held on this screen' : 'Auto resumed' }; }
+
+  // ---------------------------------------------------------------------------------------------
   // the engines
   function step(g) {
     if (g === 'le') return leStep(live.games.le, live.players.le, !!(live.vote && live.vote.game === 'le' && live.vote.state === 'open'));
@@ -406,6 +481,23 @@ function make(o) {
 
   // ---------------------------------------------------------------------------------------------
   // votes
+  // Core Vessels' audience vote on the console's 2 or 3 suspects: the game's own day vote opens first (its tally is
+  // what the audience's counts replace), then /vote. From the Director, the launcher's vote screen covers the game.
+  async function openCvVote(o2) {
+    const room = saved.rooms.cv, g0 = live.games.cv;
+    const v = VLE.nominationValid(live.nominees, alive().map((p) => String(p.id)));
+    if (!v.ok) return { error: v.reason + ' on the console' };
+    if (g0 && !g0.voting_open) await run('captain', () => db.captain(room, 'openvote'));
+    const noms = live.nominees.slice();
+    await run('vote-cv', () => db.control(room, { event_mode: true, game: 'cv', cmd: 'open_vote', nonce: Date.now(), nominees: noms, override: null }));
+    const ps = live.players.cv.filter((p) => noms.includes(String(p.id)));
+    const m = mapOptions(ps.map((p) => ({ id: p.id, label: p.name })), live.players.cv, show.cast);
+    const opened = await openVote({ game: 'cv', room, auto: !o2.cue, cue: o2.cue, prompt: o2.prompt || (show.director && show.director.votePrompt) || 'Who leaves the house?',
+      candidates: m.candidates, labels: m.labels, map: m.map, secs: o2.secs || Math.round(times().vote) });
+    if (!opened) return { error: 'Couldn’t open the vote: ' + (live.db.err || 'try again') };
+    live.nominees = []; changed();
+    return { ok: true };
+  }
   async function openVote(v) {
     const r = await run('vote-open', () => db.openVote(show.id, v));
     if (!r || !r.ok) { if (r) fail('vote-open', r.reason); return null; }
@@ -500,15 +592,7 @@ function make(o) {
       const ids = Array.isArray(cue.screen.candidates) ? cue.screen.candidates : show.cast.map((c) => c.id);
       await openVote({ game: 'practice', practice: true, cue: cue.id, prompt: cue.screen.title || cue.title, candidates: ids, labels: null, map: {}, secs: cue.timer || 0 });
     } else if (type === 'vote' && g === 'cv') {
-      const room = saved.rooms.cv, g0 = live.games.cv;
-      if (g0 && !g0.voting_open && step('cv').action === 'openvote') await run('captain', () => db.captain(room, 'openvote'));
-      const noms = live.nominees.slice();
-      await run('vote-cv', () => db.control(room, { event_mode: true, game: 'cv', cmd: 'open_vote', nonce: Date.now(), nominees: noms, override: null }));
-      const ps = live.players.cv.filter((p) => noms.includes(String(p.id)));
-      const m = mapOptions(ps.map((p) => ({ id: p.id, label: p.name })), live.players.cv, show.cast);
-      const opened = await openVote({ game: 'cv', room, cue: cue.id, prompt: (cue.screen && cue.screen.title) || 'Who leaves the house?',
-        candidates: m.candidates, labels: m.labels, map: m.map, secs: cue.timer || 0 });
-      if (opened) { live.nominees = []; changed(); }
+      await openCvVote({ cue: cue.id, prompt: cue.screen && cue.screen.title, secs: cue.timer });   // an old-style vote cue
     }
     // a cue may start its game (the first game cue: engine "start"), only if that's what the game is waiting for
     if (cue.engine && g && saved.made[g]) {
@@ -527,6 +611,10 @@ function make(o) {
     // the room sees who won Lesser Evil and the MVP; only the console sees the prize pick
     const out = { online: !!db, db: live.db, vote: v, leWinner: saved.leWinner || null, mvp: mvp() };
     if (!forConsole) return out;
+    // the Director, for the console's game track
+    out.director = { mode: dirMode(), held: dir.held, screen: dir.screen, since: dir.since, readySince: dir.readySince,
+      autoAt: dir.screen && dirMode() === 'auto' && !dir.held ? Director.autoAt(dir.screen, dir.since, dir.readySince, times()) : null,
+      history: dir.history.slice(-8).map((h) => ({ key: h.key, title: h.title })) };
     const g = gameOf(cue) || (state && state.started && segOf(cue) >= 4 ? 'cv' : 'le');
     return Object.assign(out, {
       rooms: saved.rooms, made: saved.made, registered: saved.registered, phones: live.phones,
@@ -543,7 +631,9 @@ function make(o) {
 
   const voteOpen = () => !!(live.vote && live.vote.state === 'open');
 
+  const directorOn = (cue) => directing(cue) && !!db;
   return { attach, reset, engines, cueChanged, setContext, preflight, engineStep, toggleNominee, closeVote, extendVote, voteOpen, snapshot, stop, pickFor,
+    directorGo, setDirMode, holdDir, directorOn,
     // for the tests
     _live: live, _saved: () => saved, _tick: tick };
 }

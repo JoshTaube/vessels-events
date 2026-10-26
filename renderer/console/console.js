@@ -1,7 +1,8 @@
 // Vessels Events: the operator console. Draws the show the main process sends and turns keys and clicks into
-// commands: Space = GO, 1-6 = safety cues, Esc = clear, R / E = at a looping cue, another round or move on,
-// Shift+Backspace = back one cue, N = the game's next step, V = close the audience vote now. Nothing here decides
-// anything; the main process, the cue engine and the night (main/night.js) do.
+// commands: Space = GO (in a game cue: the game's next screen), Shift+Space = the next cue, 1-6 = safety cues,
+// Esc = clear (or back to the live game), R / E = at a looping cue, another round or move on, Shift+Backspace = back
+// (in a game cue: show the previous screen again), A = Manual / Auto, H = hold Auto, V = close the audience vote now.
+// Nothing here decides anything; the main process, the cue engine and the night (main/night.js, main/director.js) do.
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
@@ -66,6 +67,13 @@
     $('nextMeta').textContent = n ? [n.segment, n.kind === 'loop' ? `Round ${n.round}` : '', n.say ? '“' + fill(n.say, n, st) + '”' : ''].filter(Boolean).join(' · ') : '';
     $('nextLock').classList.toggle('hidden', !(n && n.lock));
     $('nextLock').textContent = n && n.lock ? n.lock : '';
+    // in a game cue GO plays the game: the next card says what it does there, and where Shift+Space goes
+    const D = p.live && p.live.director, ds = D && D.screen;
+    if (ds && !ds.end) {
+      $('nextId').textContent = '▶';
+      $('nextTitle').textContent = ds.go ? (ds.blocked ? ds.blocked : ds.go.label) : (ds.why || 'Waiting for the game');
+      $('nextMeta').textContent = 'The game · Shift+Space: ' + (n ? 'next cue ' + n.id + ' ' + fill(n.title, n, st) : 'end of the cue list');
+    }
 
     // a looping cue: the two ways out
     const b = v.branch;
@@ -188,19 +196,44 @@
       $('noms').classList.add('hidden'); $('vbox').classList.add('hidden');
       return;
     }
-    const le = L.game === 'le', s = L.step || {};
+    const le = L.game === 'le', s = L.step || {}, D = L.director || {}, ds = D.screen;
     card.className = 'card game' + (le ? ' le' : '');
+    // Manual / Auto / Hold
+    $('gMode').querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === (D.mode || 'manual')));
+    $('gHold').classList.toggle('held', !!D.held); $('gHold').disabled = D.mode !== 'auto';
+    $('gHold').textContent = D.held ? 'Held' : 'Hold';
+    $('gReplay').classList.toggle('hidden', !p.replay);
+    if (p.replay) $('gReplay').innerHTML = `REPLAY on the projector: <b>${esc(p.replay.title)}</b> · Space or Esc returns to the live game`;
+    $('gTrackBox').classList.toggle('hidden', !ds);
     $('gName').textContent = le ? 'Lesser Evil' : 'Vessels';
     $('gRoom').textContent = L.rooms ? L.rooms[L.game] + (L.made && !L.made[L.game] ? ' · not open yet' : '') : '';
     const net = $('gNet');
     if (L.db && L.db.err) { net.textContent = 'Network trouble'; net.className = 'net bad'; net.title = L.db.err; }
     else if (L.db && L.db.ok) { net.textContent = 'Online'; net.className = 'net ok'; net.title = ''; }
     else { net.textContent = 'Connecting'; net.className = 'net'; net.title = ''; }
-    $('gWhere').textContent = !L.registered ? 'Setting up tonight’s rooms…' : s.where || '';
-    $('gHint').textContent = s.pending ? `Waiting for the screen to take “${s.pending}”…` : (s.hint || '');
-    $('gStep').disabled = !s.action || !!s.pending;
-    $('gStepTxt').textContent = s.label || 'Nothing to press right now';
-    const ex = (s.extra || []).map((e) => `<button data-act="${esc(e.action)}">${esc(e.label)}</button>`).join('');
+    if (ds) {
+      // a game cue: the screen on the projector, whether it's ready, its clock, what GO (and Auto) will do
+      $('gWhere').textContent = ds.title;
+      $('gHint').textContent = [ds.detail, !ds.ready && ds.why && ds.why !== ds.detail ? ds.why : ''].filter(Boolean).join(' · ');
+      const st_ = $('gState');
+      st_.textContent = ds.end ? 'Game over' : ds.ready ? 'Ready' : 'Waiting';
+      st_.className = 'gstate ' + (ds.end ? 'done' : ds.ready ? 'ready' : 'wait');
+      $('gClock').dataset.end = ds.clock || '';
+      $('gStep').disabled = !ds.go; $('gStep').classList.toggle('blocked', !!ds.blocked);
+      $('gStepTxt').textContent = ds.go ? (ds.blocked || ds.go.label) : (ds.why || 'Waiting for the game');
+      $('gAuto').dataset.at = D.autoAt || '';
+      $('gAuto').dataset.mode = D.mode === 'auto' ? (D.held ? 'held' : ds.manual || ds.end ? 'stop' : 'auto') : 'manual';
+      const tr = (D.history || []).slice(-5).map((h) => `<li class="${p.replay && p.replay.title === h.title ? 'shown' : ''}">${esc(h.title)}</li>`).join('') + `<li class="cur">${esc(ds.title)}</li>`;
+      if ($('gTrack')._html !== tr) { $('gTrack').innerHTML = tr; $('gTrack')._html = tr; }
+    } else {
+      // not in a game cue: where the game stands (GO plays it from its game cue)
+      $('gWhere').textContent = !L.registered ? 'Setting up tonight’s rooms…' : s.where || '';
+      $('gHint').textContent = s.pending ? `Waiting for the screen to take “${s.pending}”…` : (s.hint || '');
+      $('gState').textContent = ''; $('gClock').dataset.end = ''; $('gAuto').dataset.at = ''; $('gAuto').dataset.mode = '';
+      $('gStep').disabled = true; $('gStep').classList.remove('blocked');
+      $('gStepTxt').textContent = 'GO plays the game from its game cue';
+    }
+    const ex = ((ds ? ds.extra : s.extra) || []).map((e) => `<button data-act="${esc(e.action)}">${esc(e.label)}</button>`).join('');
     if ($('gExtra')._html !== ex) { $('gExtra').innerHTML = ex; $('gExtra')._html = ex; }
 
     // Core Vessels: pick 2 or 3 suspects during the day, before GO into the vote
@@ -261,23 +294,31 @@
     VesselsScreens.tick($('pvstage'));
     const vl = $('vLeft'), end = +(vl.dataset.end || 0);
     vl.textContent = end ? clock(end - Date.now()) : '';
+    const gc = $('gClock'), ge = +(gc.dataset.end || 0), gl = ge - Date.now();
+    gc.textContent = ge ? clock(gl) : ''; gc.classList.toggle('low', !!ge && gl < 10000);
+    const ga = $('gAuto'), at = +(ga.dataset.at || 0), md = ga.dataset.mode;
+    ga.innerHTML = md === 'auto' ? (at ? `Auto moves on in <b>${clock(Math.max(0, at - Date.now()))}</b>` : 'Auto: waiting for the screen to be ready')
+      : md === 'held' ? 'Held: Auto waits on this screen (H to resume)' : md === 'stop' ? 'Auto stops here: GO when you’re ready'
+      : md === 'manual' ? 'Manual: the game waits for GO' : '';
   }
   setInterval(tick, 250);
   addEventListener('resize', () => { if (P) renderProjector(P); });
 
   // ---------------------------------------------------------------------------------------------
   // commands
-  async function go() {
+  async function go(cueOnly) {
     $('goBtn').classList.add('hit'); setTimeout(() => $('goBtn').classList.remove('hit'), 120);
-    const r = await send({ type: 'go' });
+    const r = await send(cueOnly ? { type: 'go', cue: true } : { type: 'go' });
     if (r && r.error) toast(r.error, true);
   }
+  const inGame = () => !!(P && P.live && P.live.director && P.live.director.screen);
+  async function dir(cmd) { const r = await send(cmd); if (r && r.error) toast(r.error, true); }
   async function safety(id) {
     if (id === 'S4' || id === 'S6') { picker = picker === id ? null : id; renderPicker(); return; }
     const r = await send({ type: 'safety', id });
     if (r && r.error) toast(r.error, true);
   }
-  $('goBtn').onclick = go;
+  $('goBtn').onclick = () => go();
   $('qrBtn').onclick = () => send({ type: 'qr' });
   $('backBtn').onclick = () => send({ type: 'back' });
   $('extendBtn').onclick = () => safety('S5');
@@ -296,7 +337,13 @@
     const r = await send(action ? { type: 'engine', action } : { type: 'engine' });
     if (r && r.error) toast(r.error, true);
   }
-  $('gStep').onclick = () => engine();
+  $('gStep').onclick = () => go();   // the game's next screen: the same as Space
+  $('gMode').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.mode) dir({ type: 'director-mode', mode: b.dataset.mode });
+    else if (b.dataset.hold) dir({ type: 'director-hold' });
+  };
+  $('gBack').onclick = () => dir({ type: 'replay-back' });
   $('gExtra').onclick = (e) => { const b = e.target.closest('[data-act]'); if (b) engine(b.dataset.act); };
   $('nomChips').onclick = (e) => { const b = e.target.closest('[data-nom]'); if (b) send({ type: 'nominee', id: b.dataset.nom }); };
   $('prizeChips').onclick = async (e) => {
@@ -335,12 +382,17 @@
     if (e.target.tagName === 'SELECT' && e.code !== 'Space' && e.key !== 'Escape') return;
     if (e.target.tagName === 'SELECT') e.target.blur();
     if (e.repeat) { if (e.code === 'Space') e.preventDefault(); return; }
-    if (e.code === 'Space') { e.preventDefault(); go(); return; }
-    if (e.key === 'Escape') { if (picker) { picker = null; renderPicker(); return; } send({ type: 'clear' }).then((r) => r && r.error && status(r.error)); return; }
+    if (e.code === 'Space') { e.preventDefault(); go(e.shiftKey); return; }
+    if (e.key === 'Escape') {
+      if (picker) { picker = null; renderPicker(); return; }
+      if (P && P.replay) { dir({ type: 'replay-live' }); return; }
+      send({ type: 'clear' }).then((r) => r && r.error && status(r.error)); return;
+    }
     if (/^[1-6]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); safety('S' + e.key); return; }
-    if (e.key === 'Backspace' && e.shiftKey) { e.preventDefault(); send({ type: 'back' }); return; }
+    if (e.key === 'Backspace' && e.shiftKey) { e.preventDefault(); if (inGame()) dir({ type: 'replay-back' }); else send({ type: 'back' }); return; }
+    if ((e.key === 'a' || e.key === 'A') && P && P.live && P.live.online) { dir({ type: 'director-mode', mode: P.live.director && P.live.director.mode === 'auto' ? 'manual' : 'auto' }); return; }
+    if ((e.key === 'h' || e.key === 'H') && P && P.live && P.live.online) { dir({ type: 'director-hold' }); return; }
     if ((e.key === 'q' || e.key === 'Q') && P && P.show) { send({ type: 'qr' }); return; }
-    if ((e.key === 'n' || e.key === 'N') && P && P.show) { if (!$('gStep').disabled) engine(); else toast($('gWhere').textContent, true); return; }
     if ((e.key === 'v' || e.key === 'V') && P && P.show) { closeVote(); return; }
     if ((e.key === 'r' || e.key === 'R') && P && P.view && P.view.branch) { send({ type: 'arm', way: 'loop' }); return; }
     if ((e.key === 'e' || e.key === 'E') && P && P.view && P.view.branch) { send({ type: 'arm', way: 'exit' }); return; }

@@ -280,7 +280,6 @@
     {
       "id": "310",
       "title": "The race",
-      "engine": "start",
       "say": "Candidates, take your places. Audience: phones out, you decide every round.",
       "screen": {
         "type": "game",
@@ -336,97 +335,12 @@
     },
     {
       "id": "505",
-      "title": "Roles dealt",
-      "replayStart": true,
+      "title": "The game",
+      "say": "Cast, phones out. When the roles are dealt, keep yours to yourself.",
       "screen": {
         "type": "game",
         "game": "vessels",
-        "title": "The roles are dealt"
-      },
-      "engine": "start",
-      "say": "The roles are dealt. Check your phones, and keep them to yourselves."
-    },
-    {
-      "id": "510",
-      "title": "The floor",
-      "screen": {
-        "type": "game",
-        "game": "vessels",
-        "title": "Who are you?"
-      }
-    },
-    {
-      "id": "520",
-      "title": "Night {round} falls",
-      "screen": {
-        "type": "game",
-        "game": "vessels",
-        "title": "Night falls",
-        "showRound": true
-      }
-    },
-    {
-      "id": "530",
-      "title": "Dawn",
-      "screen": {
-        "type": "game",
-        "game": "vessels",
-        "title": "Dawn"
-      }
-    },
-    {
-      "id": "540",
-      "title": "Testimony",
-      "screen": {
-        "type": "game",
-        "game": "vessels",
-        "title": "Testimony"
-      }
-    },
-    {
-      "id": "550",
-      "title": "The accused",
-      "say": "Deliberation is over. I’m naming the accused.",
-      "screen": {
-        "type": "game",
-        "game": "vessels",
-        "title": "The accused"
-      }
-    },
-    {
-      "id": "560",
-      "title": "Audience votes",
-      "timer": 30,
-      "say": "Jury, vote now.",
-      "screen": {
-        "type": "vote",
-        "title": "Who leaves the house?"
-      }
-    },
-    {
-      "id": "570",
-      "title": "The verdict",
-      "loopTo": "520",
-      "loopLabel": "Next night",
-      "exitLabel": "Game over",
-      "screen": {
-        "type": "game",
-        "game": "vessels",
-        "title": "The verdict"
-      }
-    },
-    {
-      "id": "580",
-      "title": "Game over",
-      "loopTo": "505",
-      "loopTimes": 0,
-      "replay": true,
-      "loopLabel": "Play again, same cast",
-      "exitLabel": "On to the finale",
-      "screen": {
-        "type": "game",
-        "game": "vessels",
-        "title": "Game over"
+        "title": "The game"
       }
     },
     {
@@ -472,5 +386,18 @@
         "tagline": "Thank you. Good night."
       }
     }
-  ]
+  ],
+  "director": {
+    "mode": "manual",
+    "times": {
+      "read": 8,
+      "podium": 4,
+      "story": 12,
+      "introHold": 8,
+      "nightfall": 5,
+      "dawn": 10,
+      "verdict": 10,
+      "vote": 30
+    }
+  }
 }

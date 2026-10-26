@@ -59,10 +59,15 @@
   <section class="colC">
     <div class="card game" id="gameCard">
       <div class="lbl"><span id="gName">The game</span> <span class="quiet" id="gRoom"></span><span class="net" id="gNet"></span></div>
+      <div class="gmode" id="gMode"><button data-mode="manual">Manual</button><button data-mode="auto">Auto</button><button data-hold="1" id="gHold">Hold</button><kbd>A</kbd><kbd>H</kbd></div>
+      <div class="greplay hidden" id="gReplay"></div>
+      <div class="gnow"><span class="gstate" id="gState"></span><span class="gclock" id="gClock"></span></div>
       <div class="gwhere" id="gWhere">Offline</div>
       <div class="ghint" id="gHint"></div>
-      <button class="gstep" id="gStep" disabled><b id="gStepTxt">Nothing to press</b><kbd>N</kbd></button>
+      <button class="gstep" id="gStep" disabled><span class="gk">GO</span><b id="gStepTxt">Nothing to press</b><kbd>Space</kbd></button>
+      <div class="gauto" id="gAuto"></div>
       <div class="gextra" id="gExtra"></div>
+      <div class="gtrack hidden" id="gTrackBox"><div class="ptitle">Screens so far <button class="tbtn sm" id="gBack">◀ Back <kbd>Shift+⌫</kbd></button></div><ol id="gTrack"></ol></div>
       <div class="noms hidden" id="noms"><div class="ptitle">Suspects for the vote <span id="nomCount"></span></div><div class="chips" id="nomChips"></div></div>
       <div class="vbox hidden" id="vbox">
         <div class="vhead"><b id="vTitle"></b><span id="vLeft"></span></div>
@@ -95,7 +100,7 @@
   </div>
 </section>
 
-<div class="keys"><span><kbd>Space</kbd> GO</span><span><kbd>1</kbd>–<kbd>6</kbd> safety</span><span><kbd>Esc</kbd> clear</span><span><kbd>R</kbd>/<kbd>E</kbd> loop or move on</span><span><kbd>N</kbd> game step</span><span><kbd>V</kbd> close vote</span><span><kbd>Q</kbd> corner QR</span><span><kbd>Shift</kbd>+<kbd>⌫</kbd> back</span></div>
+<div class="keys"><span><kbd>Space</kbd> GO</span><span><kbd>1</kbd>–<kbd>6</kbd> safety</span><span><kbd>Esc</kbd> clear</span><span><kbd>R</kbd>/<kbd>E</kbd> loop or move on</span><span><kbd>Shift</kbd>+<kbd>Space</kbd> next cue</span><span><kbd>A</kbd> auto <kbd>H</kbd> hold</span><span><kbd>V</kbd> close vote</span><span><kbd>Q</kbd> corner QR</span><span><kbd>Shift</kbd>+<kbd>⌫</kbd> back</span></div>
 <div class="toast hidden" id="toast"></div>
 
 <script src="../shared/screens.js"></script>

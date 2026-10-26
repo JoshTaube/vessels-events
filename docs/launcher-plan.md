@@ -185,6 +185,52 @@ items 1 to 3) is built here alongside the engine (Josh, 2026-10-26). Phase 3 kee
    the pick first. The console and the host view see it; the room doesn't. A replay of Vessels deals at random (the
    prize is for the first game; decided 2026-10-26).
 
+### Phase 2b: the Director (Josh, 2026-10-26: "we need more control")
+Josh: "the launcher should actually be playing the game and the person running the controls can move from screen
+to screen or let it automatically do so." Decided: the **Director** approach (production's rules and screens stay;
+every screen change moves to the launcher), with all four controls below. Not a rebuild of the engines (that would
+fork the games from production).
+
+**The rule: a game never changes screen by itself.** Every place either game moved itself in event mode is held
+behind the launcher (event patches):
+- Core Vessels: the introductions' floor passing on (after a role claim, or the 10 s auto-advance), introductions
+  rolling into night, the night's action window opening, the window resolving when its countdown ends, the
+  testimony floor passing on, the tie coin's backstop, the Final Girl's verdict. (Already held since Phase 2: the
+  story, the role reveal, dawn, the day's opening, the discussion clock, the vote result.)
+- Lesser Evil: the clock running out on a position pick, a speech, a rock-paper-scissors throw or the kingmaker's
+  choice; the last candidate locking a position (it no longer jumps to the speeches); both sudden-death teams
+  choosing sides. A speaker's phone no longer starts their own clock: the launcher does.
+- Players still play: they pick, throw, act at night, name suspects. What they can no longer do is move the room
+  on. When their part of a screen is done, the screen is **ready**, and the launcher moves on.
+
+**The game track.** During a game cue the console shows the game as screens: what's on the projector now, whether
+it's ready (and why not: "2 positions still to pick", "Bram is speaking, 0:42"), its clock, what GO does next
+("Start Ava's speech", "Reveal the dawn", "Open the audience vote"), and the screens played so far.
+
+**One GO.** In a game cue Space moves the game to its next screen. When the game is over (Lesser Evil's results,
+Vessels' game over), Space moves on to the next cue. Shift+Space moves the cue list at any time (the way out). N
+is gone. The sample show's per-beat cues (Vessels 510 to 580) collapse into one game cue, like Lesser Evil's 310.
+
+**Manual and Auto** (A toggles, per night, saved). Manual: nothing moves until Space. Auto: each screen moves on
+by itself once it's ready and has been up for its time:
+- a screen with the game's own clock (a speech, a pick, a ballot, the night window) moves when the clock runs out
+  (or earlier once everyone has done their part, for picks);
+- a screen waiting on players (a speaker claiming a role, naming suspects) moves a few seconds after they're done,
+  with a ceiling so a silent phone can't stall the room;
+- a screen to be read (a reveal, the dawn, the vote result) holds for its time;
+- the show file's `director.times` sets every one of those (seconds), `director.mode` the starting mode.
+- Auto stops where only a person can decide: Core Vessels' suspects (the console asks for 2 or 3), the end of a
+  game. **H** holds Auto on the current screen; H again resumes.
+
+**Back** (Shift+Backspace in a game cue): the projector shows the previous screen again, as it looked, without
+touching the game (the launcher keeps a picture of each screen as it plays). Back again goes further back; Space or
+Esc returns to the live game. The console marks the projector REPLAY while it's up.
+
+**Votes in the flow.** Core Vessels' audience vote becomes a screen in the game (from the discussion, GO opens it
+with the suspects picked on the console; the launcher's vote screen covers the game while it's open, since the
+game's own vote screen is the room's checklist). Lesser Evil's stay as they are (the game's ballot board and the
+vote panel).
+
 ### Phase 3: host view, MVP (the vote items below land in Phase 2)
 1. **Tables** (event project), RLS on, anon can only do what each page needs:
    - `ev_vote` — one row per vote round: `id`, `game`, `candidates` (player ids only), `opens_at`, `closes_at`,
@@ -332,8 +378,8 @@ database and the live site (`npm run check:night`).
   sense, sent as `captain_action`. Lesser Evil: the TV's own host buttons (`LE_HOST.hostActions`), run inside its
   page. A cue's `engine` field takes a step on entry, only if it's the step the game is waiting for (the sample:
   `start` on 310 and 505). Different from the proposal: the game's progress isn't modelled as cues. The games have
-  more beats than any cue list (a speaker each, a Lesser Evil race's ballots), so cues set the screen and N moves
-  the game.
+  more beats than any cue list (a speaker each, a Lesser Evil race's ballots), so cues set the screen and N moved
+  the game. **Superseded by the Director (Phase 2b, below): N is gone, Space plays the game in its game cue.**
 - **Lesser Evil in the cue list** is one game cue (310): its engine runs the rounds, and its ballots come to the
   audience by themselves. The sample's old per-round cues (320 to 380) are gone. The night's prompts replace the
   game's topic banks of the same name (they're drawn three per candidate, so "in order" didn't fit the game).
