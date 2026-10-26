@@ -3,7 +3,8 @@
 // drives it over the DevTools protocol with real phones (headless Chrome, phone-sized) on the live event site:
 //   1. the launcher registers the night; the Lesser Evil TV it hosts creates its room; cast phones check in; the
 //      host's phone (/host) takes the host code and the console sees it
-//   2. the practice vote runs the whole vote pipe; the host's phone has the cue's line and the live count
+//   2. the practice vote runs the whole vote pipe; the host's phone has the cue's line and the live count; a music
+//      track plays, fades as the race goes up, and Duck takes the race's own sound down (all muted: --mute)
 //   3. Lesser Evil, played with Space alone (the Director, Manual): nothing moves on its own (a screen stays up, a
 //      speech whose clock runs out stays up), each ballot goes to /vote with the game's own board on the
 //      projector; the race is crowned; the winner picks their prize; Space at the results moves to the next cue
@@ -41,10 +42,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, `night-${n
 const showJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'shows/sample-show/show.json'), 'utf8'));
 showJson.director = { mode: 'manual', times: { read: 3, story: 3, rolesHold: 1, rolesMax: 4, introHold: 2, introMax: 5, nightfall: 2, nightDone: 2,
   dawn: 3, testimonyHold: 2, testimonyMax: 5, verdict: 4, vote: 12, podium: 2, pickHold: 1 } };
+// the copy lives in a temp folder: its music points back at the sample's own files
+const SAMPLE_DIR = path.join(ROOT, 'shows/sample-show');
+for (const t of [...(showJson.music.tracks || []), ...(showJson.music.stingers || [])]) if (t.file) t.file = path.resolve(SAMPLE_DIR, t.file);
 const SHOWFILE = path.join(DATA, 'show.json');
 fs.writeFileSync(SHOWFILE, JSON.stringify(showJson));
 
-const app = spawn(electronPath, ['.', `--show=${SHOWFILE}`, `--user-data=${DATA}`, `--remote-debugging-port=${PORT}`, '--display=none', '--fresh'],
+const app = spawn(electronPath, ['.', `--show=${SHOWFILE}`, `--user-data=${DATA}`, `--remote-debugging-port=${PORT}`, '--display=none', '--fresh', '--mute'],
   { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
 const mainLog = [];
 app.stdout.on('data', (d) => mainLog.push(String(d).trim()));
@@ -134,11 +138,26 @@ try {
   ok('the host knows who won', !!(await waitFor(async () => /wins|tie/.test(await htext('#voteState')), 8000)), await htext('#voteState'));
   ok('leaving the cue closes it', !!(await waitFor(async () => /Closed · 1 vote/.test(await text('#vTotal')), 8000)), await text('#vTotal'));
 
+  // the music (Phase 4): a track plays between the games
+  await con.click('[data-track="3"]');
+  ok('a music track plays between the games', !!(await waitFor(async () => (await text('#mNowT')) === 'Lesser Evil rounds' && /\d+:\d\d \//.test(await text('#mNowP')), 8000)), await text('#mNowT'));
+
   // ---------------------------------------------------------------------------------------------
   // 3. Lesser Evil, Manual, Space only
   await space(); await space(); await space();   // 301 305 310
   ok('GO reaches the race cue', (await nowId()) === '310', await nowId());
   ok('the race cue shows the game track: the lobby', /Lobby/.test(await screenTitle()), await screenTitle());
+  // the games keep their own music: the track fades as the race goes up, and no track starts over it
+  ok('the race going up fades the launcher’s track', !!(await waitFor(async () => (await text('#mNowT')) === 'Silence', 8000)), await text('#mNowT'));
+  await con.click('[data-track="1"]');
+  ok('no track starts while a game is on the projector', !!(await waitFor(async () => /plays its own music/.test(await text('#toast')), 4000)) && (await text('#mNowT')) === 'Silence', await text('#toast'));
+  // Duck reaches the game: its own TV master volume (shared by both TVs: the same laptop origin)
+  const leTv = () => dis.frames().find((f) => /lesser-evil-tv\.html/.test(f.url()));
+  const tvVol = () => leTv().evaluate(() => localStorage.getItem('vessels_opt_volume'));
+  await con.click('#mDuck');
+  ok('Duck takes the race’s own sound down 12 dB', !!(await waitFor(async () => (await tvVol()) === '25', 5000)), await tvVol());
+  await con.click('#mDuck');
+  ok('and back up', !!(await waitFor(async () => (await tvVol()) === '100', 5000)), await tvVol());
   ok('the host’s phone turns red, white and blue with the race’s screen on it', !!(await waitFor(async () =>
     (await host.$eval('body', (b) => b.classList.contains('le'))) && (await htext('#gameLbl')) === 'Lesser Evil' && /Lobby/.test(await htext('#gameT')), 8000)), await htext('#gameT'));
   const leSeats = await waitFor(async () => { const ps = await db.players(LE); return CAST.every((c) => ps.some((p) => p.name === c[2])) ? ps : null; }, 30000, 1500);
@@ -227,6 +246,8 @@ try {
   await space();
   const dealt = await waitFor(async () => { const g = await db.game(CV); return g && g.phase !== 'lobby' ? g.phase : null; }, 20000, 1000);
   ok('GO deals the roles', !!dealt, dealt);
+  const cvTv = dis.frames().find((f) => /\/tv\.html/.test(f.url()));
+  ok('the Vessels TV takes the launcher’s volume and duck too', !!cvTv && (await cvTv.evaluate(() => typeof apSetMasterVol === 'function').catch(() => false)));
   if (winner) {
     const me = await waitFor(async () => { const p = (await db.players(CV)).find((x) => x.name === winner[2]); return p && p.role ? p : null; }, 15000, 1000);
     ok('the Lesser Evil winner is dealt the role they picked', me && me.role === 'host-demon', me && me.role);

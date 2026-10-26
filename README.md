@@ -4,9 +4,9 @@ The desktop show launcher for live Vessels nights (Dojo Disco). The operator run
 laptop screen, the audience display full screen on the projector. The plan for every phase is in
 [docs/launcher-plan.md](docs/launcher-plan.md).
 
-**Status: Phase 3** (the host's phone), on top of Phase 2 with the Director (the games, played by the launcher; the
-cast phones; the audience vote) and Phase 1 (two windows, projector detection, show files, the cue engine with GO,
-loops, locks and safety cues). Music, the Stream Deck and the load test come in Phases 4 and 5.
+**Status: Phase 4** (the music and the Stream Deck), on top of Phase 3 (the host's phone), Phase 2 with the Director
+(the games, played by the launcher; the cast phones; the audience vote) and Phase 1 (two windows, projector detection,
+show files, the cue engine with GO, loops, locks and safety cues). The load test comes in Phase 5.
 
 What Phase 2 does:
 - **The games run in the projector window.** The launcher hosts Lesser Evil and Vessels (the event build of
@@ -44,6 +44,18 @@ What Phase 2 does:
   sees them at once. The screen stays on while the page is open (where the phone allows it). The console's host card
   says whether the host's phone is in, and gives its address and code. On a tablet the page goes two columns: the
   script on the left (the cue, what's next, the game), the room on the right (the vote, the suspects, the prize).
+- **The music** (Phase 4): the music card under the projector preview plays the show file's 8 tracks (a new one
+  crossfades over the last; they loop unless the file says otherwise), 4 stingers over them, **Fade**, **Duck** (12 dB
+  down for the host's mic) and the volume (3 dB steps). It plays through the laptop's main output: pick the PA in
+  Windows' sound settings and the launcher follows (the card shows which output it's on). **The games keep their own
+  music**: a track fades out when a game goes on the projector, and no track starts while one is up; Duck and the
+  volume reach the games too, and stingers play over them.
+- **The Stream Deck** (Phase 4, a 15-key MK.2 with Elgato's stock Hotkey action, no plugin): GO, Next cue, Back,
+  Live, Panic, Auto, Hold, Close vote, +30 s, Duck, Fade and three stingers on the main page; the 8 tracks, the volume,
+  the fourth stinger and GO again in a Music folder. The keys are F13 to F23 (Shift or Ctrl for the music), which
+  nothing else uses, and the launcher hears them whichever window has the focus. **Stream Deck & sound** on the music
+  card shows both pages with the night's names, how to set the Deck up, and a test mode (press a key: its tile
+  lights, nothing happens in the show).
 - **No Scholar** on event nights: their power is a second vote, and the cast doesn't vote. A full table of 12 is
   Demon, Priest, Nun, Anointed, Vanquisher and seven Townsfolk. (Production keeps its Scholar.)
 
@@ -80,6 +92,8 @@ and the saved show somewhere else, `--offline` never touches the event database.
 2. Open the launcher on the night's show. The game panel turns **Online** and the Lesser Evil lobby appears.
 3. Hand each cast member their code card. Seats light as they check in. Click a seat to mark a dead phone by hand.
 4. Give the host the host page and code (the console's host card shows both). The card turns *host phone live*.
+5. Set Windows' sound output to the PA, then **Stream Deck & sound** → **Test sound**. Plug the Stream Deck in and
+   press every key in test mode.
 
 ## Try Phase 2 (about 20 minutes, with 3 or 4 phones)
 
@@ -119,6 +133,8 @@ npm run check:phones     # the live site: /cast check-in, follow into a room, /v
 npm run check:night      # the whole night online: the real launcher, the event database, phones on the live site
 ```
 
+The tests launch the app with `--mute`: the music and the games play, silently.
+
 `check:night` plays the night the way the operator does: the practice vote, a full Lesser Evil race with Space
 alone on Manual (checking nothing moves on its own), the prize pick, then Core Vessels on Auto up to and through its
 first audience vote, with Hold and Back. A host phone follows along and picks the suspects. It takes several
@@ -132,7 +148,9 @@ for /host), the Lesser Evil prompts, the music bank, the media, the cue list. Pa
 `shows/sample-show/show.json` and section 4 of the plan. Phase 2 adds, per cue: `engine` (a game step taken on
 entry, e.g. `"start"` on each game's first cue) and `cast` (`"le"`, `"cv"` or `"none"`: where the cast phones go,
 otherwise decided by the segment). `lesserEvil.prompts` replace the game's own topics bank by bank;
-`lesserEvil.voteSecs` is how long each Lesser Evil ballot stays open (30). A `title` screen with `"winner": "le"`
+`lesserEvil.voteSecs` is how long each Lesser Evil ballot stays open (30). `music.tracks`: up to 8, on
+`button` 1 to 8, each with `name` and `file` and `"loop": false` for one that plays once; `music.stingers`: up to 4
+(`name`, `file`). A `title` screen with `"winner": "le"`
 shows Lesser Evil's champion. `director` sets how the games are played: `"mode": "manual"` or `"auto"` to start
 the night in, and `"times"`: the seconds Auto gives each kind of screen (`read`, `podium`, `pickHold`, `grace`,
 `story`, `rolesHold`, `rolesMax`, `introHold`, `introMax`, `nightfall`, `windowMax`, `nightDone`, `dawn`,
@@ -144,9 +162,11 @@ Defaults are in `main/director.js`.
 - `main/`: Electron main process (windows, projector, saving, commands, the replay pictures), `night.js` (the
   online side: rooms, check-in, the engines, votes, the prize, the MVP, Manual / Auto), `director.js` (each game's
   screens: what's on, whether it's ready, what GO does, when Auto moves on), `server.js` (the TVs' web server),
-  `ev.js` (the event database)
+  `ev.js` (the event database), `music.js` (the music: tracks, crossfades, Duck, the volume, stingers, the games'
+  level), `deck.js` (the Stream Deck's keys)
 - `src/`: the cue engine and the show file loader (no Electron, unit-tested)
-- `renderer/`: the console, the audience display, the shared Vessels look and screens, bundled fonts and logos
+- `renderer/`: the console, the audience display, the hidden music player (`audio/`), the shared Vessels look and
+  screens, bundled fonts and logos
 - `web/`: the event site build (`build-event.js` generates it from production, `event-patches.js` are the anchored
   patches, `site/` the event-only pages /cast, /vote and /host, `functions/` the cached current-vote function, `sql/` the
   event database, in order)

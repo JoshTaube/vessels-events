@@ -271,7 +271,7 @@ vote panel).
    - Ties: today the first player in seat order wins a tie. At the event a tie means co-MVPs (decided 2026-10-26).
    - If Vessels is replayed, the MVP is the best skill total across the night's Vessels games.
 
-### Phase 4: music and the Stream Deck
+### Phase 4: music and the Stream Deck (built 2026-10-26: see "Phase 4: what's built"; the games keep their own music, and the Deck carries the show's controls first)
 1. **Music engine** on its own track, independent of cues: Web Audio in the main window, two decks for ~2 s
    crossfades, a duck (about -12 dB) for the host mic, volume steps, one-shot stingers over the music. Output device
    picker in settings (`setSinkId`), remembered.
@@ -301,7 +301,7 @@ count check with 12 simulated cast phones and the host view attached.
 1. Open Vessels Events. It loads the last show file (or Show → Open show file…).
 2. Plug in the projector. The audience display jumps to it full screen. If it picks the wrong screen, pick the right
    one under Projector; it's remembered.
-3. Plug in the Stream Deck. Pick the audio output (Phase 4).
+3. Set Windows' sound output to the PA; Stream Deck & sound → Test sound. Plug in the Stream Deck; test its keys.
 4. Cast check in with their codes; seats light; GO.
 
 ## 8. Decisions and open questions
@@ -432,7 +432,7 @@ It's a build-time switch, since the event site only runs event nights. Productio
 - Lesser Evil starts only when every candidate has typed a campaign slogan on their phone (production's rule). The
   game panel says who it's waiting for.
 - The cast captain's phone can still press Next in Lesser Evil, as in production. The operator's N does the same.
-- Not yet: music and the Stream Deck, the load test.
+- Not yet: the load test.
 
 ---
 
@@ -497,3 +497,48 @@ on / off taps, taps outside the discussion ignored, the vote's counts by name), 
 a wrong code refused, the right one in, the console sees it, the cue's line, the practice vote's count before the
 reveal and its winner, the Lesser Evil look and ballot, the prize behind its button, the suspects tapped on the
 phone and lit on the console, the same page at tablet size in two columns, then the vote).
+
+---
+
+## Phase 4: what's built (2026-10-26)
+
+The music and the Stream Deck. Josh's calls (2026-10-26): the games keep their own music; a 15-key Stream Deck (MK.2)
+carrying the show's controls first and the music second; the sound goes out of the laptop's main output.
+
+### The music
+- `main/music.js` is the model (unit-tested); a hidden window (`renderer/audio`) plays it with plain audio elements,
+  their volume moved by a timer (no Web Audio graph, so a local file is never treated as cross-origin). One bed at a
+  time: a new track crossfades over the last in 2 s (the first starts in 0.15 s), Fade takes 3 s. Tracks loop unless
+  the show file says `"loop": false`. Up to 4 stingers play over the bed. Duck is 12 dB down (0.3 s down, 0.7 s up);
+  the volume steps 3 dB from full down to -30 dB. Stingers follow the volume, not the duck.
+- The games keep their own music: when a game goes on the projector the track fades out (2.5 s) and the console says
+  so, and no track starts while a game is up (the CV vote is not a game screen: the launcher's vote screen covers it
+  and the game is muted, so a track can play under it). Stingers still play over a game.
+- Duck and the volume reach the games as their own TV master volume (0 to 100): both TVs already have the setter the
+  captain's phone uses (`apSetMasterVol` in Vessels, on the page; `leSetMasterVol` in Lesser Evil, inside its script,
+  so one event patch, `le-tv:master-vol`, hands it out as `window.__vlSetMasterVol`).
+  The launcher sets it whenever the level changes and whenever a TV loads.
+- The output: the laptop's main output (whatever Windows plays to). The music card and the setup sheet name it, and
+  the console says when it changes; **Test sound** plays a two-note chime there.
+- The console's music card (under the projector preview): the 8 tracks with the night's names (a missing file is
+  struck through), what's playing and where, Fade, Duck, the volume, the 4 stingers. If the player window ever dies,
+  the console says the music stopped and it restarts.
+- `--mute` (the tests): everything plays, nothing is heard.
+
+### The Stream Deck
+- `main/deck.js` is the layout. Elgato's stock Hotkey action (System) can send F13 to F24 (from the list under the
+  arrow beside its Hotkey box), with Shift or Ctrl. The launcher registers each key system-wide (`globalShortcut`),
+  so the Deck works whichever window has the focus, and a key another app holds is named on the setup sheet.
+- Main page: GO (F13), Next cue (F14), Back (F15: an earlier screen in a game, else back one cue), Live (F16: back to
+  the live game, or take a safety card down), Panic (F17: S1), Auto (F18), Hold (F19), Close vote (F20), +30 s (F21),
+  Duck (F22), Fade (F23), Stingers 1 to 3 (Shift+F13 to F15), and key 15 a Stream Deck folder, Music: Tracks 1 to 8
+  (Ctrl+F13 to F20), Fade, Volume down and up (Ctrl+F21, F22), Duck, Stinger 4 (Shift+F16) and GO again. F24 is spare.
+- **Stream Deck & sound** (the music card) draws both pages with the night's track and stinger names and the key for
+  each, the setup steps, and a test mode: a key pressed lights its tile and does nothing in the show. Clicking a tile
+  does what its key does.
+
+### Tests
+`npm test` (125 unit tests: the music model, the key map, the show file's music checks), `npm run smoke` (47
+checks: the tracks, a crossfade, Duck, the volume, a stinger, the setup sheet and its test mode, Fade),
+`npm run check:night` (a track between the games fades as the race goes up, none starts over it, Duck takes the
+race's own sound down and back up, the Vessels TV has its setter).

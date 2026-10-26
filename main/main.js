@@ -4,13 +4,15 @@
 //
 // Phase 2: the night goes online (main/night.js). The two games run inside the audience display, hosted from the
 // laptop's own web server (main/server.js); the cast phones check in and follow the show; the audience votes on /vote.
+// Phase 4: the music (main/music.js, played by a hidden window) and the Stream Deck (main/deck.js: system-wide keys).
 //
 // Command line (handy for rehearsal and the smoke test): --show=<file> loads that show file; --user-data=<dir> keeps
 // settings and saved state somewhere else; --fresh ignores any saved position; --display=none never takes a screen;
-// --offline never touches the event database (no games, no phones, no votes: the Phase 1 launcher).
+// --offline never touches the event database (no games, no phones, no votes: the Phase 1 launcher); --mute plays
+// everything silently (the tests); --no-deck leaves the Stream Deck's keys to other apps.
 'use strict';
 
-const { app, BrowserWindow, ipcMain, screen, dialog, Menu, webFrameMain } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu, webFrameMain, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -22,8 +24,11 @@ const QR = require('../src/qr.js');
 const EV = require('./ev.js');
 const Night = require('./night.js');
 const Server = require('./server.js');
+const Music = require('./music.js');
+const Deck = require('./deck.js');
 
 const arg = (k) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : null; };
+const MUTE = process.argv.includes('--mute');   // the tests: everything plays, nothing is heard
 if (arg('user-data')) app.setPath('userData', path.resolve(arg('user-data')));
 if (!app.requestSingleInstanceLock()) app.exit(0);
 
@@ -34,6 +39,8 @@ let store, settings;
 let show = null, state = null, problems = { errors: [], warnings: [], file: null };
 let consoleWin = null, displayWin = null, projector = null;   // projector: the Electron display the audience sees, or null
 let night = null, web = null, siteProblem = null;              // the online side; the TVs' web server
+let audioWin = null, music = null;                             // the music: its hidden player window and its model
+const deck = { test: false, last: null, failed: [] };          // the Stream Deck: test mode, the last key heard, keys we couldn't take
 
 // The event database: config/event.local.json (the operator key lives there and never leaves this process).
 function eventConfig() {
@@ -61,6 +68,7 @@ function loadShow(file, opts) {
   }
   save(true);
   if (night) { night.attach(show); night.setContext(state, curCue()); }
+  if (music) music.setBank(show.music);
   broadcast();
   return true;
 }
@@ -123,6 +131,9 @@ function payload(forConsole, extra) {
     projector: projector ? Displays.describe(projector, primaryId) : null,
     displayChoice: settings.display ? settings.display.id : null,
     version: app.getVersion(),
+    music: music ? music.status() : null,
+    deck: { test: deck.test, last: deck.last, failed: deck.failed, actions: Deck.ACTIONS,
+      keys: Deck.KEYS.map((x) => Object.assign({}, x, { label: Deck.labelFor(x, show && show.music) })) },
   });
 }
 // what the host's phone (/host) shows of the cue list: the cue and its line, what's next, the clock, a safety card.
@@ -147,8 +158,11 @@ function broadcast(extra) {
     const p = payload(false);
     displayWin.webContents.send('state', p);
     // the games' sound only while a game is on the projector (a hidden TV keeps playing its music otherwise)
-    const loud = (p.engines || []).some((e) => e.visible) && !(state && state.safety && state.safety.full);
+    const gameUp = (p.engines || []).some((e) => e.visible);
+    const loud = gameUp && !MUTE && !(state && state.safety && state.safety.full);
     if (displayWin.webContents.isAudioMuted() === loud) displayWin.webContents.setAudioMuted(!loud);
+    // a game going up fades the launcher's music: the game plays its own
+    if (music) { const r = music.gameOn(gameUp); if (r && r.flash && state) state.flash = { text: r.flash, at: Date.now() }; }
     thumbs(p.engines.some((e) => e.visible));
   }
   pictureLoop();
@@ -283,7 +297,82 @@ function makeDisplay() {
     if (isMain) return;
     const f = webFrameMain.fromId(proc, routing);
     if (f && /\/lesser-evil-tv\.html/.test(f.url)) feedPrompts(f);
+    if (f && music && /\/(lesser-evil-tv|tv)\.html/.test(f.url)) f.executeJavaScript(levelJs(music.gameLevel())).catch(() => {});
   });
+}
+
+// The music's hidden player. It plays through the laptop's main output (Josh, 2026-10-26: whatever Windows is set to).
+function makeAudio() {
+  audioWin = new BrowserWindow({ show: false, width: 320, height: 200, title: 'Vessels Events: music',
+    webPreferences: Object.assign({}, webPrefs, { autoplayPolicy: 'no-user-gesture-required' }) });
+  audioWin.loadFile(path.join(__dirname, '..', 'renderer', 'audio', 'index.html'));
+  if (MUTE) audioWin.webContents.setAudioMuted(true);
+  audioWin.on('close', (e) => { if (!app.quitting) e.preventDefault(); });
+  // if it ever dies the music stops: say so, and start a fresh one
+  audioWin.webContents.on('render-process-gone', () => { if (music) music.report({ type: 'gone' }); if (!app.quitting) setTimeout(() => audioWin && !audioWin.isDestroyed() && audioWin.reload(), 500); });
+}
+const toAudio = (m) => { if (audioWin && !audioWin.isDestroyed()) audioWin.webContents.send('music', m); };
+// The duck and the volume reach the games as their own TV master volume (0 to 100): both TVs have the setter the
+// captain's phone uses (apSetMasterVol in Vessels; Lesser Evil's leSetMasterVol, handed out by the le-tv:master-vol
+// event patch since it lives inside the TV's script).
+const levelJs = (v) => `(function(v){try{if(typeof apSetMasterVol==='function')apSetMasterVol(v);if(typeof window.__vlSetMasterVol==='function')window.__vlSetMasterVol(v);}catch(e){}return v;})(${+v})`;
+function applyGameLevel(v) { for (const g of ['le', 'cv']) { const f = engineFrame(g); if (f) f.executeJavaScript(levelJs(v)).catch(() => {}); } }
+
+// The music's commands (the console's music card, the Stream Deck)
+function musicCmd(c) {
+  if (!music) return { error: 'The music isn’t ready' };
+  let r;
+  switch (c.op) {
+    case 'play': r = music.play(c.n); break;
+    case 'fade': r = music.fade(); break;
+    case 'duck': r = music.duck(); break;
+    case 'vol': r = music.vol(c.n); break;
+    case 'sting': r = music.stinger(c.n); break;
+    case 'test': r = music.test(); break;
+    default: r = { error: 'Unknown music command' };
+  }
+  if (r && r.ok && r.flash && state) state.flash = { text: r.flash, at: Date.now() };
+  broadcast(r && r.error ? { error: r.error } : undefined);
+  return r;
+}
+
+// The Stream Deck: each key, what it does. In test mode a key only lights its tile on the console's setup sheet.
+async function deckPress(id) {
+  if (deck.test) { deck.last = { id, at: Date.now() }; broadcast(); return { ok: true }; }
+  const m = /^track(\d)$/.exec(id), s = /^sting(\d)$/.exec(id);
+  if (m) return musicCmd({ op: 'play', n: +m[1] });
+  if (s) return musicCmd({ op: 'sting', n: +s[1] });
+  const inGame = !!(night && show && state && night.directorOn(curCue()));
+  switch (id) {
+    case 'go': return command({ type: 'go' }, true);
+    case 'next': return command({ type: 'go', cue: true }, true);
+    case 'back': return command(inGame ? { type: 'replay-back' } : { type: 'back' }, true);
+    case 'live': return command(replayAt >= 0 ? { type: 'replay-live' } : { type: 'clear' }, true);
+    case 'panic': return command({ type: 'safety', id: 'S1' }, true);
+    case 'auto': {
+      const d = night && show ? (night.snapshot(state, curCue(), true) || {}).director : null;
+      return command({ type: 'director-mode', mode: d && d.mode === 'auto' ? 'manual' : 'auto' }, true);
+    }
+    case 'hold': return command({ type: 'director-hold' }, true);
+    case 'close-vote': return command({ type: 'vote-close' }, true);
+    case 'extend': return command({ type: 'safety', id: 'S5' }, true);
+    case 'duck': return musicCmd({ op: 'duck' });
+    case 'fade': return musicCmd({ op: 'fade' });
+    case 'vol-down': return musicCmd({ op: 'vol', n: -1 });
+    case 'vol-up': return musicCmd({ op: 'vol', n: 1 });
+    default: return { error: 'Unknown Stream Deck key' };
+  }
+}
+// The keys, system-wide: the Stream Deck types them into whatever window has the focus, so the launcher takes them
+// from Windows itself. A key another app already holds is listed on the setup sheet.
+function registerDeck() {
+  deck.failed = [];
+  if (process.argv.includes('--no-deck')) return;
+  for (const s of Deck.SHORTCUTS) {
+    let ok = false;
+    try { ok = globalShortcut.register(s.accelerator, () => { deckPress(s.id).catch((e) => console.error('deck:', e)); }); } catch (e) { ok = false; }
+    if (!ok) deck.failed.push(s.key);
+  }
 }
 
 // Put the audience display on the projector, full screen; no projector: a preview window on the laptop.
@@ -379,6 +468,15 @@ async function command(cmd, fromConsole) {
       broadcast(r && r.error ? { error: r.error } : undefined);
       return r;
     }
+    // the music card, the Stream Deck's setup sheet (test mode; a tile clicked does what its key does)
+    case 'music': return fromConsole ? musicCmd(cmd) : { error: 'console only' };
+    case 'deck-test': {
+      if (!fromConsole) return { error: 'console only' };
+      deck.test = !!cmd.on; deck.last = null;
+      broadcast();
+      return { ok: true };
+    }
+    case 'deck-press': return fromConsole ? deckPress(String(cmd.id || '')) : { error: 'console only' };
     default:
       // the display window may only send the show keys (GO, safety, clear) when it's the preview on the laptop
       if (!fromConsole && !['go', 'safety', 'clear'].includes(cmd && cmd.type)) return { error: 'console only' };
@@ -394,6 +492,10 @@ app.whenReady().then(async () => {
   settings = store.read('settings.json', {});
   ipcMain.handle('cmd', (e, cmd) => command(cmd, consoleWin && e.sender === consoleWin.webContents));
   ipcMain.on('hello', () => broadcast());
+  // the music: its model, and what its player window says back
+  music = Music.make({ send: toAudio, onChange: broadcastSoon, onLevel: applyGameLevel, url: fileUrl,
+    notice: (text, bad) => { if (bad) broadcast({ error: text }); else if (state) { state.flash = { text, at: Date.now() }; broadcastSoon(); } } });
+  ipcMain.on('music-report', (e, m) => { if (audioWin && e.sender === audioWin.webContents) music.report(m); });
   // the TVs' web server and the night (unless offline)
   const cfg = eventConfig();
   if (cfg) {
@@ -404,6 +506,8 @@ app.whenReady().then(async () => {
   }
   makeConsole();
   makeDisplay();
+  makeAudio();
+  registerDeck();
   ['display-added', 'display-removed', 'display-metrics-changed'].forEach((ev) => screen.on(ev, () => place()));
   const file = arg('show') ? path.resolve(arg('show')) : settings.showFile;
   if (file) loadShow(file, { fresh: process.argv.includes('--fresh') });
@@ -412,3 +516,4 @@ app.whenReady().then(async () => {
 app.on('second-instance', () => { if (consoleWin) { if (consoleWin.isMinimized()) consoleWin.restore(); consoleWin.focus(); } });
 app.on('before-quit', () => { app.quitting = true; save(true); if (night) night.stop(); });
 app.on('window-all-closed', () => app.quit());
+app.on('will-quit', () => globalShortcut.unregisterAll());

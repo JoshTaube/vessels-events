@@ -2,7 +2,8 @@
 // commands: Space = GO (in a game cue: the game's next screen), Shift+Space = the next cue, 1-6 = safety cues,
 // Esc = clear (or back to the live game), R / E = at a looping cue, another round or move on, Shift+Backspace = back
 // (in a game cue: show the previous screen again), A = Manual / Auto, H = hold Auto, V = close the audience vote now.
-// Nothing here decides anything; the main process, the cue engine and the night (main/night.js, main/director.js) do.
+// The music card and the Stream Deck sheet (Phase 4) send music and deck commands; the Stream Deck's own keys go
+// straight to the main process. Nothing here decides anything; the main process, the cue engine and the night (main/night.js, main/director.js) do.
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
@@ -106,6 +107,8 @@
     renderPad(p);
     renderSeats(show, st, p.live);
     renderGame(p);
+    renderMusic(p);
+    renderDeck(p);
     // host mirror
     $('hvCue').textContent = c ? `${c.id} · ${fill(c.title, c, st)}` : 'Standing by';
     $('hvLine').textContent = say || '';
@@ -294,6 +297,54 @@
     if (m) $('mvpTxt').innerHTML = m.players.length ? m.players.map((x) => `<b>${esc(x.name)}</b> · ${x.skill} skill points`).join('<br>') + (m.games > 1 ? `<br>${m.games} games` : '') : 'Nobody has scored a skill point yet';
   }
 
+  // the music card: the night's 8 tracks, what's playing, Fade / Duck / volume, the stingers
+  function renderMusic(p) {
+    const M = p.music;
+    $('musicCard').classList.toggle('hidden', !M);
+    if (!M) return;
+    $('mOut').textContent = M.out ? 'Out: ' + M.out : '';
+    const byBtn = {}; M.tracks.forEach((t) => { byBtn[t.button] = t; });
+    const th = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => {
+      const t = byBtn[n], on = M.track && M.track.button === n;
+      return `<button class="mt${on ? ' on' : ''}${on && M.fading ? ' fading' : ''}${!t || t.missing ? ' miss' : ''}" data-track="${n}" title="${t ? esc(t.name) + (t.missing ? ': the file isn’t there' : t.loop ? ' (loops)' : ' (plays once)') : 'No track on this button'}"><i>${n}</i><span>${t ? esc(t.name) : '·'}</span></button>`;
+    }).join('');
+    if ($('mTracks')._html !== th) { $('mTracks').innerHTML = th; $('mTracks')._html = th; }
+    $('mTracks').classList.toggle('ingame', !!M.gameOn);
+    $('mNowT').textContent = M.track ? (M.fading ? 'Fading: ' : '') + M.track.name : 'Silence';
+    $('mNowT').parentNode.parentNode.classList.toggle('on', !!M.track);
+    $('mFade').disabled = !M.track || M.fading;
+    $('mDuck').classList.toggle('on', !!M.duck);
+    $('mDuck').textContent = M.duck ? 'Ducked' : 'Duck';
+    $('mVol').textContent = M.db === 0 ? 'Full' : `${M.db} dB`;
+    $('mUp').disabled = !!M.full; $('mDn').disabled = !!M.lowest;
+    const sh = [1, 2, 3, 4].map((n) => {
+      const s = M.stingers[n - 1];
+      return `<button class="${!s || s.missing ? 'miss' : ''}" data-sting="${n}" title="${s ? esc(s.name) : 'No stinger'}">${s ? esc(s.name) : '·'}</button>`;
+    }).join('');
+    if ($('mStings')._html !== sh) { $('mStings').innerHTML = sh; $('mStings')._html = sh; }
+    const hint = M.gameOn ? 'A game is on the projector: it plays its own music. Stingers, Duck and the volume still work.' : '';
+    $('mHint').textContent = hint; $('mHint').classList.toggle('hidden', !hint);
+  }
+
+  // the Stream Deck and sound sheet: the 15-key pages with the night's names, test mode, keys another app holds
+  function renderDeck(p) {
+    const D = p.deck, M = p.music;
+    if (!D) return;
+    $('dOut').textContent = M && M.out ? M.out : 'the laptop’s main output';
+    for (const [page, el] of [['main', $('dMain')], ['music', $('dMusic')]]) {
+      const ks = D.keys.filter((k) => k.page === page).sort((a, b) => a.slot - b.slot);
+      const h = ks.map((k) => k.id
+        ? `<button class="dk${k.id === 'go' ? ' dkgo' : ''}${k.id === 'panic' ? ' panic' : ''}${D.failed.includes(k.key) ? ' bad' : ''}" data-id="${esc(k.id)}" title="${esc(D.actions[k.id] || '')}"><b>${esc(k.label)}</b><kbd>${esc(k.key)}</kbd></button>`
+        : `<div class="dk nav"><b>${esc(k.folder ? 'Music folder' : 'Back')}</b></div>`).join('');
+      if (el._html !== h) { el.innerHTML = h; el._html = h; }
+    }
+    $('dTestMode').checked = !!D.test;
+    const note = $('dNote');
+    if (D.failed.length) { note.className = 'dnote warn'; note.textContent = `Another app already uses ${D.failed.join(', ')}: those keys won’t reach the launcher until it lets go (close it, then restart the launcher).`; }
+    else if (D.test) { note.className = 'dnote on'; note.textContent = 'Test mode: press each Stream Deck key. Its tile lights here; nothing happens in the show.'; }
+    else { note.className = 'dnote'; note.textContent = 'Every key is ready.'; }
+  }
+
   // timers and clocks between state updates
   function tick() {
     const now = new Date();
@@ -312,6 +363,17 @@
     ga.innerHTML = md === 'auto' ? (at ? `Auto moves on in <b>${clock(Math.max(0, at - Date.now()))}</b>` : 'Auto: waiting for the screen to be ready')
       : md === 'held' ? 'Held: Auto waits on this screen (H to resume)' : md === 'stop' ? 'Auto stops here: GO when you’re ready'
       : md === 'manual' ? 'Manual: the game waits for GO' : '';
+    // the music's place in its track (the player says where it started; a looping bed wraps)
+    const M = P.music, mt = M && M.track;
+    if (mt && M.dur) {
+      let pos = M.pos + (Date.now() - M.at) / 1000;
+      if (mt.loop) pos %= M.dur; else pos = Math.min(pos, M.dur);
+      $('mNowP').textContent = `${clock(pos * 1000)} / ${clock(M.dur * 1000)}`;
+      $('mBar').style.width = (100 * pos / M.dur).toFixed(1) + '%';
+    } else { $('mNowP').textContent = ''; $('mBar').style.width = '0%'; }
+    // the Stream Deck sheet in test mode: the key just pressed lights for a moment
+    const DK = P.deck;
+    document.querySelectorAll('#deckSheet .dk').forEach((el) => el.classList.toggle('hit', !!(DK && DK.test && DK.last && DK.last.id === el.dataset.id && Date.now() - DK.last.at < 1500)));
   }
   setInterval(tick, 250);
   addEventListener('resize', () => { if (P) renderProjector(P); });
@@ -385,11 +447,35 @@
   $('mReload').onclick = async () => { const r = await send({ type: 'reload-show' }); toast(r && r.ok ? 'Show file reloaded' : (r && r.error) || 'Couldn’t reload', !(r && r.ok)); };
   $('mReset').onclick = () => send({ type: 'reset-show' });
 
+  // the music card
+  const music = async (op, n) => { const r = await send({ type: 'music', op, n }); if (r && r.error) toast(r.error, true); };
+  $('mTracks').onclick = (e) => { const b = e.target.closest('[data-track]'); if (b) music('play', +b.dataset.track); };
+  $('mStings').onclick = (e) => { const b = e.target.closest('[data-sting]'); if (b) music('sting', +b.dataset.sting); };
+  $('mFade').onclick = () => music('fade');
+  $('mDuck').onclick = () => music('duck');
+  $('mDn').onclick = () => music('vol', -1);
+  $('mUp').onclick = () => music('vol', 1);
+  // the Stream Deck and sound sheet: test mode goes off when it closes
+  const sheetOpen = () => !$('deckSheet').classList.contains('hidden');
+  const closeSheet = () => { $('deckSheet').classList.add('hidden'); if (P && P.deck && P.deck.test) send({ type: 'deck-test', on: false }); };
+  $('mDeckBtn').onclick = () => $('deckSheet').classList.remove('hidden');
+  $('deckClose').onclick = closeSheet;
+  $('deckSheet').onclick = (e) => { if (e.target === $('deckSheet')) closeSheet(); };
+  $('dTest').onclick = () => music('test');
+  $('dTestMode').onchange = () => send({ type: 'deck-test', on: $('dTestMode').checked });
+  document.querySelector('#deckSheet .decks').onclick = async (e) => {
+    const b = e.target.closest('.dk[data-id]'); if (!b) return;
+    const r = await send({ type: 'deck-press', id: b.dataset.id });
+    if (r && r.error) toast(r.error, true);
+  };
+
   // a clicked button or the projector menu keeps the keyboard otherwise, and Space would press it instead of GO
   document.addEventListener('click', (e) => { if (e.target.closest('button')) e.target.closest('button').blur(); }, true);
   $('projSel').addEventListener('change', () => $('projSel').blur());
 
   addEventListener('keydown', (e) => {
+    // the setup sheet: Esc closes it, and the show's keys wait (the Stream Deck's keys still work)
+    if (sheetOpen()) { if (e.key === 'Escape') closeSheet(); return; }
     if (e.target.closest && e.target.closest('input, textarea')) return;
     if (e.target.tagName === 'SELECT' && e.code !== 'Space' && e.key !== 'Escape') return;
     if (e.target.tagName === 'SELECT') e.target.blur();

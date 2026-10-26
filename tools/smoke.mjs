@@ -27,7 +27,7 @@ const check = (name, ok, detail) => { results.push({ name, ok: !!ok }); console.
 
 async function launch(extra) {
   // --offline: this is the launcher on its own (no event database, no games); tools/launcher-check.mjs runs it online
-  const child = spawn(electronPath, ['.', '--show=shows/sample-show/show.json', `--user-data=${DATA}`, `--remote-debugging-port=${PORT}`, '--display=none', '--offline', ...extra], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(electronPath, ['.', '--show=shows/sample-show/show.json', `--user-data=${DATA}`, `--remote-debugging-port=${PORT}`, '--display=none', '--offline', '--mute', ...extra], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
   const errs = [];
   child.stderr.on('data', (d) => { const t = String(d); if (/error/i.test(t) && !/DevTools listening|GPU|gpu|cache|Autofill/i.test(t)) errs.push(t.trim()); });
   let browser = null;
@@ -149,6 +149,42 @@ try {
   const download = await con.$('[data-cue="620"]'); await download.click({ clickCount: 2 }); await sleep(700);
   await dis.screenshot({ path: path.join(SHOTS, 'display-620-download.png') });
   await (await con.$('[data-cue="401"]')).click({ clickCount: 2 }); await sleep(700);
+
+  // the music (Phase 4): the night's 8 tracks, crossfades, Duck, the volume, a stinger, Fade; the Stream Deck sheet
+  const names = await con.$$eval('#mTracks .mt span', (s) => s.map((x) => x.textContent));
+  check('the music card has the night’s 8 tracks', names.length === 8 && names[0] === 'Menu', names.join(', '));
+  check('it names the sound output', /^Out: ./.test((await text(con, '#mOut')) || ''), await text(con, '#mOut'));
+  await con.click('[data-track="1"]');
+  const playing = async (name) => (await text(con, '#mNowT')) === name && /^\d+:\d\d \/ \d+:\d\d$/.test((await text(con, '#mNowP')) || '');
+  let ok1 = false; for (let k = 0; k < 16 && !ok1; k++) { await sleep(250); ok1 = await playing('Menu'); }
+  check('track 1 plays (the player says where it is)', ok1, `${await text(con, '#mNowT')} ${await text(con, '#mNowP')}`);
+  await con.click('[data-track="2"]');
+  let ok2 = false; for (let k = 0; k < 16 && !ok2; k++) { await sleep(250); ok2 = await playing('Lobby'); }
+  check('track 2 crossfades over it', ok2, await text(con, '#mNowT'));
+  await con.click('#mDuck'); await sleep(300);
+  check('Duck ducks', (await text(con, '#mDuck')) === 'Ducked');
+  await con.click('#mDuck'); await con.click('#mDn'); await sleep(300);
+  check('the volume steps down 3 dB', (await text(con, '#mVol')) === '-3 dB', await text(con, '#mVol'));
+  await con.click('#mUp'); await sleep(200);
+  await con.click('[data-sting="1"]'); await sleep(300);
+  check('a stinger plays over the bed', !/wouldn’t play|isn’t there/.test((await text(con, '#toast')) || ''), await text(con, '#toast'));
+  await con.screenshot({ path: path.join(SHOTS, 'console-music.png') });
+  await con.click('#mDeckBtn'); await sleep(300);
+  check('the Stream Deck sheet shows both 15-key pages', (await con.$$('#dMain .dk')).length === 15 && (await con.$$('#dMusic .dk')).length === 15);
+  check('its tiles take the night’s track names', (await con.$eval('#dMusic [data-id="track1"] b', (b) => b.textContent)) === 'Menu');
+  await con.click('#dTestMode'); await sleep(300);
+  await con.click('#dMain [data-id="duck"]'); await sleep(300);
+  check('test mode: a key lights its tile and does nothing', (await con.$eval('#dMain [data-id="duck"]', (b) => b.classList.contains('hit'))) && (await text(con, '#mDuck')) === 'Duck');
+  await con.screenshot({ path: path.join(SHOTS, 'console-deck-sheet.png') });
+  await con.click('#dTestMode'); await sleep(300);
+  await con.click('#dMusic [data-id="track3"]');
+  let ok3 = false; for (let k = 0; k < 16 && !ok3; k++) { await sleep(250); ok3 = (await text(con, '#mNowT')) === 'Lesser Evil rounds'; }
+  check('out of test mode a tile does what its key does', ok3, await text(con, '#mNowT'));
+  await key('Escape');
+  check('Esc closes the sheet', await con.$eval('#deckSheet', (e) => e.classList.contains('hidden')));
+  await con.click('#mFade');
+  let ok4 = false; for (let k = 0; k < 24 && !ok4; k++) { await sleep(250); ok4 = (await text(con, '#mNowT')) === 'Silence'; }
+  check('Fade fades it out', ok4, await text(con, '#mNowT'));
   check('no page errors', app.pageErrs.length === 0, app.pageErrs.join(' | '));
 } finally {
   await app.browser.disconnect().catch(() => {});

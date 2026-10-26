@@ -1,5 +1,5 @@
-// Vessels Events: the one bridge between a window and the main process. Both windows get the same three calls; the
-// main process knows which window is asking and what it may see (the projector never gets the codes).
+// Vessels Events: the one bridge between a window and the main process. Every window gets the same calls; the main
+// process knows which window is asking and what it may see (the projector never gets the codes).
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -12,4 +12,9 @@ contextBridge.exposeInMainWorld('vessels', {
   onThumb: (fn) => { ipcRenderer.on('thumb', (_e, url) => fn(url)); },
   // the projector only: an earlier screen of the game shown again (Back), or null for the live game
   onReplay: (fn) => { ipcRenderer.on('replay', (_e, url) => fn(url)); },
+  // the hidden music window only: what to play comes in, what's playing goes back (main/music.js)
+  audio: {
+    on: (fn) => { ipcRenderer.on('music', (_e, m) => fn(m)); ipcRenderer.send('music-report', { type: 'ready' }); },
+    report: (m) => ipcRenderer.send('music-report', m),
+  },
 });

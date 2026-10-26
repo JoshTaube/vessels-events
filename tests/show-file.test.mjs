@@ -103,3 +103,14 @@ test('the night id: lower case and dashes, or made from the name', () => {
   assert.match(ShowFile.check(none, '/x', yes).warnings.join(), /will use "vessels-live-the-cork-bar"/);
   assert.equal(ShowFile.load(SAMPLE).show.id, 'sample-night');
 });
+
+test('the music bank: "loop" is true or false; only 4 stingers get buttons; a missing file is marked', () => {
+  const o = base();
+  o.music.tracks.push({ button: 2, name: 'Bad loop', file: 'music/b.mp3', loop: 'yes' });
+  o.music.stingers = [1, 2, 3, 4, 5].map((n) => ({ name: 'S' + n, file: `sfx/${n}.mp3` }));
+  const r = ShowFile.check(o, '/x', yes);
+  assert.ok(r.errors.some((e) => /Bad loop.*"loop" is true or false/.test(e)), r.errors.join(' | '));
+  assert.ok(r.warnings.some((w) => /5 stingers: only the first 4/.test(w)));
+  const show = ShowFile.load(SAMPLE).show;
+  assert.ok(show.music.tracks.every((t) => t.missing === false), 'the sample’s music is all there');
+});

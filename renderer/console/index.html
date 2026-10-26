@@ -54,6 +54,19 @@
 
   <section class="colB">
     <div class="pvwrap"><div class="pvhead"><span class="lbl">On the projector</span><span class="aud" id="audUrl"></span><button class="tbtn sm" id="qrBtn">Corner QR · on <kbd>Q</kbd></button></div><div class="pvbox" id="pvbox"><div class="stage" id="pvstage"></div><img id="pvthumb" class="hidden" alt=""></div><div class="pvnote" id="pvnote"></div></div>
+    <div class="card music" id="musicCard">
+      <div class="lbl">Music <span class="quiet" id="mOut"></span><button class="tbtn sm mdeckbtn" id="mDeckBtn">Stream Deck &amp; sound</button></div>
+      <div class="mgrid">
+        <div class="mtracks" id="mTracks"></div>
+        <div class="mside">
+          <div class="mnow"><div class="mnowt"><b id="mNowT">Silence</b><span id="mNowP"></span></div><div class="mbar"><i id="mBar"></i></div></div>
+          <div class="mctl"><button class="mbtn" id="mFade">Fade</button><button class="mbtn" id="mDuck">Duck</button>
+            <span class="mvol"><button class="mbtn sq" id="mDn" aria-label="Volume down">−</button><b id="mVol">Full</b><button class="mbtn sq" id="mUp" aria-label="Volume up">+</button></span></div>
+          <div class="mstings" id="mStings"></div>
+        </div>
+      </div>
+      <div class="mhint hidden" id="mHint"></div>
+    </div>
     <div class="cuelist"><div class="lbl listhead">Cue list <span>double-click a cue to jump</span></div><ol id="cues"></ol></div>
   </section>
 
@@ -103,6 +116,32 @@
 
 <div class="keys"><span><kbd>Space</kbd> GO</span><span><kbd>1</kbd>–<kbd>6</kbd> safety</span><span><kbd>Esc</kbd> clear</span><span><kbd>R</kbd>/<kbd>E</kbd> loop or move on</span><span><kbd>Shift</kbd>+<kbd>Space</kbd> next cue</span><span><kbd>A</kbd> auto <kbd>H</kbd> hold</span><span><kbd>V</kbd> close vote</span><span><kbd>Q</kbd> corner QR</span><span><kbd>Shift</kbd>+<kbd>⌫</kbd> back</span></div>
 <div class="toast hidden" id="toast"></div>
+
+<!-- the Stream Deck and the sound output: the 15-key layout, test mode, how to set it up -->
+<div class="sheet hidden" id="deckSheet" role="dialog" aria-label="Stream Deck and sound">
+  <div class="sheetcard">
+    <div class="sheethead"><h2>Stream Deck and sound</h2><button class="tbtn sm" id="deckClose">Done <kbd>Esc</kbd></button></div>
+    <div class="sheetsec">
+      <div class="lbl">Sound</div>
+      <div class="outrow"><div>Music and both games play through <b id="dOut">the laptop’s main output</b>. To use another output (the PA), pick it in Windows’ sound settings: the launcher follows.</div><button class="tbtn sm" id="dTest">Test sound</button></div>
+    </div>
+    <div class="sheetsec">
+      <div class="lbl">Stream Deck <span class="quiet">15 keys</span><label class="tgl"><input type="checkbox" id="dTestMode"> Test the buttons</label></div>
+      <div class="dnote" id="dNote"></div>
+      <div class="decks">
+        <div><div class="ptitle">Main page</div><div class="deckgrid" id="dMain"></div></div>
+        <div><div class="ptitle">The Music folder (key 15)</div><div class="deckgrid" id="dMusic"></div></div>
+      </div>
+      <ol class="dsteps">
+        <li>Install Elgato’s Stream Deck app and plug the Stream Deck in.</li>
+        <li>On each key of the main page, drop a <b>Hotkey</b> action (System). Click the arrow beside its Hotkey box and pick the key shown on the tile (F13 to F23 are in the list; for Shift or Ctrl keys pick that too). Title it with the tile’s words.</li>
+        <li>On key 15, drop a <b>Create Folder</b> action and name it Music. Open it and set its keys the same way (its top-left key is the folder’s own Back).</li>
+        <li>Turn on <b>Test the buttons</b> and press every key: its tile lights here and nothing happens in the show.</li>
+      </ol>
+      <div class="dfoot">The keys work whichever window has the focus. Clicking a tile here does what its key does.</div>
+    </div>
+  </div>
+</div>
 
 <script src="../shared/screens.js"></script>
 <script src="console.js"></script>

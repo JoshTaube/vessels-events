@@ -92,7 +92,7 @@ function check(obj, dir, exists) {
   else if (!prompts.length) warn('No Lesser Evil prompts yet.');
   else prompts.forEach((p, n) => { if (!String((p && p.text) || '').trim()) err(`Lesser Evil prompt #${n + 1} has no "text".`); });
 
-  // music bank: 8 buttons
+  // music bank: 8 tracks on buttons 1 to 8 (they loop unless "loop": false), up to 4 stingers
   const tracks = (obj.music && obj.music.tracks) || [];
   const buttons = new Set();
   tracks.forEach((t, n) => {
@@ -100,10 +100,13 @@ function check(obj, dir, exists) {
     if (!(Number.isInteger(t.button) && t.button >= 1 && t.button <= 8)) return err(`${at}: "button" is 1 to 8.`);
     if (buttons.has(t.button)) err(`${at}: button ${t.button} is used twice.`);
     buttons.add(t.button);
+    if (t.loop != null && typeof t.loop !== 'boolean') err(`${at}: "loop" is true or false.`);
     if (!t.file) warn(`${at} has no file.`);
     else if (!exists(file(t.file))) warn(`${at}: file not found at ${t.file}.`);
   });
-  ((obj.music && obj.music.stingers) || []).forEach((t, n) => { if (t && t.file && !exists(file(t.file))) warn(`Stinger #${n + 1}: file not found at ${t.file}.`); });
+  const stingers = (obj.music && obj.music.stingers) || [];
+  if (stingers.length > 4) warn(`${stingers.length} stingers: only the first 4 have buttons.`);
+  stingers.forEach((t, n) => { if (t && t.file && !exists(file(t.file))) warn(`Stinger #${n + 1}: file not found at ${t.file}.`); });
   if (obj.media && obj.media.menuLoop && !exists(file(obj.media.menuLoop))) warn(`Menu loop not found at ${obj.media.menuLoop} (the built-in loop will play).`);
   // the Director: how the games are played (Manual / Auto) and Auto's times per kind of screen, in seconds
   const d = obj.director;
@@ -144,8 +147,9 @@ function load(file) {
     cast: obj.cast.map((p) => Object.assign({}, p, { code: norm(p.code), photo: p.photo && exists(abs(p.photo)) ? abs(p.photo) : null })),
     cues: obj.cues.map((c) => Object.assign({}, c, { id: String(c.id), loopTo: c.loopTo != null ? String(c.loopTo) : undefined, screen: c.screen || { type: 'black' } })),
     audience: { url: String((obj.audience && obj.audience.url) || AUDIENCE_URL) },
-    music: { tracks: ((obj.music && obj.music.tracks) || []).map((t) => Object.assign({}, t, { file: abs(t.file) })),
-      stingers: ((obj.music && obj.music.stingers) || []).map((t) => Object.assign({}, t, { file: abs(t.file) })) },
+    // missing: the console greys the button out (the file isn't there)
+    music: { tracks: ((obj.music && obj.music.tracks) || []).map((t) => Object.assign({}, t, { file: abs(t.file), missing: !(t.file && exists(abs(t.file))) })),
+      stingers: ((obj.music && obj.music.stingers) || []).map((t) => Object.assign({}, t, { file: abs(t.file), missing: !(t.file && exists(abs(t.file))) })) },
     media: Object.fromEntries(Object.entries(obj.media || {}).map(([k, v]) => [k, abs(v) && exists(abs(v)) ? abs(v) : null])),
   });
   show.fingerprint = require('crypto').createHash('sha1').update(JSON.stringify(show.cues.map((c) => [c.id, c.loopTo || '', c.loopTimes || '']))).digest('hex').slice(0, 12);

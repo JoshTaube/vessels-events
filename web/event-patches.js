@@ -826,6 +826,15 @@ function vlRenderHold(){
       applied: '// VESSELS EVENTS: the audience is the vote'
     },
     {
+      // the launcher's Duck and volume (Phase 4) set the TV master volume, the captain phone's own knob; this TV's
+      // setter lives inside its script, so it's handed out (Vessels' apSetMasterVol is already on window)
+      name: 'le-tv:master-vol',
+      find: 'function leSetMasterVol(pct){',
+      replace: "window.__vlSetMasterVol = function (p) { leSetMasterVol(p); };   // VESSELS EVENTS: the launcher's Duck and volume\n"
+        + 'function leSetMasterVol(pct){',
+      applied: "VESSELS EVENTS: the launcher's Duck and volume"
+    },
+    {
       // the room vote's name list (le-tv:room-vote-names) without its empty bars and 0% labels
       name: 'le-tv:event-css',
       find: '</head>',
