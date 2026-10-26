@@ -237,7 +237,7 @@ with the suspects picked on the console; the launcher's vote screen covers the g
 game's own vote screen is the room's checklist). Lesser Evil's stay as they are (the game's ballot board and the
 vote panel).
 
-### Phase 3: host view, MVP (the vote items below land in Phase 2)
+### Phase 3: host view, MVP (built 2026-10-26: see "Phase 3: what's built"; the vote items below landed in Phase 2)
 1. **Tables** (event project), RLS on, anon can only do what each page needs:
    - `ev_vote` — one row per vote round: `id`, `game`, `candidates` (player ids only), `opens_at`, `closes_at`,
      `practice`, `state` (`waiting` / `open` / `closed` / `revealed`).
@@ -432,5 +432,68 @@ It's a build-time switch, since the event site only runs event nights. Productio
 - Lesser Evil starts only when every candidate has typed a campaign slogan on their phone (production's rule). The
   game panel says who it's waiting for.
 - The cast captain's phone can still press Next in Lesser Evil, as in production. The operator's N does the same.
-- Not yet: the host's phone page (the console's mirror shows what it will say), music and the Stream Deck, the load
-  test.
+- Not yet: music and the Stream Deck, the load test.
+
+---
+
+## Phase 3: what's built (2026-10-26)
+
+The host's phone. Tested end to end against the event database and the live site (`npm run check:night` now runs a
+host phone alongside the night).
+
+### /host (vessels-events.netlify.app/host)
+- The host enters the show's `hostCode` once (checked as a salted hash, like the cast codes; the phone keeps it).
+  The page asks the event database about once a second (`ev_host`), no live connection, and keeps the screen awake
+  with the Wake Lock API where the phone has it (re-asked whenever the page comes back to the front).
+- What it shows, biggest first: the cue and the line to say; what's next (and its line); the cue's clock; a safety
+  card that's up on the projector and anyone reconnecting (red banner); the audience vote with its live counts by
+  name ("only you can see the counts"), then who won, a few seconds before the room's reveal (a tie says so); the
+  suspects during Core Vessels' discussion; the game's screen (its title and detail, Ready or what it's waiting for,
+  its clock, what Space does next, Manual / Auto / Held); the Lesser Evil prize (the winner's pick sits behind a
+  hold-to-see button, since the host says the rest out loud); the MVP so far; the roles in play.
+- The clocks run in the database's time: the launcher sends its times converted with its own offset to the database,
+  and the phone keeps its offset from each reply, so every countdown matches the room's whatever the phones' clocks
+  say.
+- Phone or tablet. On a phone it's one column: the cue first, then whatever the room is doing (the vote, the
+  suspects), then the game. From 720 px wide (any tablet, either way up) it's two columns: the script on the left
+  (the cue, what's next, the game) and the room on the right (the vote, the suspects, the prize, the MVP, the
+  roles), with bigger type for reading on a stand; the script alone, centred, when the room has nothing to show.
+  Landscape gives the script a little more width; portrait splits evenly so two suspects fit side by side.
+- It turns Lesser Evil's red, white and blue while the race is on (the 300s, or a Lesser Evil game screen), the 2B
+  Vessels look the rest of the night.
+- "Launcher offline" if the launcher hasn't checked in for 8 s; "No connection" after three failed asks. The show
+  never waits on the phone.
+
+### The host's taps
+- During Core Vessels' discussion the suspects are buttons (bots marked). A tap is sent as a numbered command
+  (`ev_host_cmd`) that says what the host wants ("Ava on", "Ava off"), so a tap from a screen a moment behind the
+  console can't flip a suspect back. The database keeps the last 20 taps; the launcher reads them back with each
+  publish and acts on every number it hasn't seen, in order, so two quick taps between its reads both land and a tap
+  counts once however often it's read. It's ignored outside the discussion or for anyone not alive. The first reply
+  after a launcher start only sets the count (an old tap is never replayed). The button shows the tap
+  at once (dimmed until the launcher confirms it); the console's suspect chips light the same moment.
+- Space (or the console) still opens the vote: the host chooses, the operator runs the show.
+
+### The launcher
+- `main/main.js` hands the night the cue list's part (`hostCue`: the cue and its line with `{round}` / `{game}`
+  filled in, the next one, the cue timer's end, the safety card and reconnecting names) on every broadcast.
+- `main/night.js` (`hostState`, `publishHost`, `hostCommand`) adds the Director's screen, the vote, the suspects,
+  the prize, the MVP and the roles (`dealFor` the table), and publishes once a second: the whole state when it
+  changed (or every 20 s), otherwise null, which keeps the last state and still collects the host's taps and
+  stamps "the launcher is alive".
+- The console's host card shows the phone: *host phone live*, *last seen 2 min ago* or *not in yet*, and the page's
+  address and code (or a note that the show file has no `hostCode`).
+- The discussion's prompt reads "Pick 2 or 3 suspects first" (it shows on the host's phone as well as the console).
+
+### The database
+`web/sql/06-host.sql` (migrations ve_08_host, ve_09_host_keep_state, ve_10_host_pub,
+ve_11_host_cmd_queue): `ev_show.host_state`,
+`host_cmd`, `host_seen`, `host_device`, `host_pub`; `ev_set_host` (the operator key: publish, read back the
+last tap and when the host's phone last asked), `ev_host` and `ev_host_cmd` (the host code).
+
+### Tests
+`npm test` (117 unit tests: the host's state, the clock offset, a tap acting once, two quick taps both landing,
+on / off taps, taps outside the discussion ignored, the vote's counts by name), `npm run smoke` (34 checks), `npm run check:night` (now with a host phone:
+a wrong code refused, the right one in, the console sees it, the cue's line, the practice vote's count before the
+reveal and its winner, the Lesser Evil look and ballot, the prize behind its button, the suspects tapped on the
+phone and lit on the console, the same page at tablet size in two columns, then the vote).

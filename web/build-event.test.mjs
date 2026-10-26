@@ -139,13 +139,13 @@ test('the runtime config refuses a missing key or a non-https site', () => {
   assert.throws(() => B.runtimeConfig({ supabaseUrl: 'https://e.supabase.co', anonKey: 'k', site: 'http://x' }), /site/);
 });
 
-test('the event-only files are the cast hub, the vote page and their modules', () => {
-  for (const f of ['cast.html', 'vote.html', 'ev.js', 'ev.css']) assert.ok(B.LOCAL.includes(f), f + ' is not in LOCAL');
+test('the event-only files are the cast hub, the vote page, the host page and their modules', () => {
+  for (const f of ['cast.html', 'vote.html', 'host.html', 'ev.js', 'ev.css']) assert.ok(B.LOCAL.includes(f), f + ' is not in LOCAL');
   for (const f of ['event-config.js', 'ev.js', 'event-mode.js']) assert.ok(B.EVENT_MODULES.includes(f), f + ' is not injected');
 });
 
-test('Netlify serves /cast and /vote, trailing slash included', () => {
-  for (const p of ['cast', 'vote']) {
+test('Netlify serves /cast, /vote and /host, trailing slash included', () => {
+  for (const p of ['cast', 'vote', 'host']) {
     assert.match(B.REDIRECTS, new RegExp('^/' + p + '\\s+/' + p + '\\.html\\s+200\\s*$', 'm'));
     assert.match(B.REDIRECTS, new RegExp('^/' + p + '/\\s+/' + p + '\\.html\\s+200\\s*$', 'm'));
   }

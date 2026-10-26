@@ -125,8 +125,23 @@ function payload(forConsole, extra) {
     version: app.getVersion(),
   });
 }
+// what the host's phone (/host) shows of the cue list: the cue and its line, what's next, the clock, a safety card.
+// The night adds the game, the vote and the rest, and publishes it.
+function hostCue() {
+  if (!show || !state) return null;
+  const v = Engine.view(show, state, Date.now());
+  const fill = (t, c) => String(t || '').replace(/\{round\}/g, c ? c.round : 1).replace(/\{game\}/g, state.games || 1);
+  const cue = (c) => c && { id: c.id, title: fill(c.title, c), say: c.say ? fill(c.say, c) : '', segment: c.segment };
+  const t = state.timer, sf = state.safety || {};
+  return {
+    started: !!state.started, cue: cue(v.current), next: v.next ? Object.assign(cue(v.next), { kind: v.next.kind || null }) : null,
+    timer: t ? { endsAt: t.start + t.secs * 1000 } : null,
+    safety: sf.full ? (Engine.SAFETY[sf.full] || {}).label || sf.full : null, reconnecting: (sf.reconnecting || []).slice(),
+  };
+}
 function broadcast(extra) {
   clearTimeout(broadcast.soon); broadcast.soon = null;
+  if (night) night.setHostCue(hostCue());
   if (consoleWin && !consoleWin.isDestroyed()) consoleWin.webContents.send('state', payload(true, extra));
   if (displayWin && !displayWin.isDestroyed()) {
     const p = payload(false);

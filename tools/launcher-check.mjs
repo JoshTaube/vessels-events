@@ -1,14 +1,15 @@
 // Vessels Events: the whole night, online, played the way the operator plays it. Launches the real launcher (a
 // throwaway data folder, fresh rooms, the event database) on a copy of the sample show with short Auto times, and
 // drives it over the DevTools protocol with real phones (headless Chrome, phone-sized) on the live event site:
-//   1. the launcher registers the night; the Lesser Evil TV it hosts creates its room; cast phones check in
-//   2. the practice vote runs the whole vote pipe
+//   1. the launcher registers the night; the Lesser Evil TV it hosts creates its room; cast phones check in; the
+//      host's phone (/host) takes the host code and the console sees it
+//   2. the practice vote runs the whole vote pipe; the host's phone has the cue's line and the live count
 //   3. Lesser Evil, played with Space alone (the Director, Manual): nothing moves on its own (a screen stays up, a
 //      speech whose clock runs out stays up), each ballot goes to /vote with the game's own board on the
 //      projector; the race is crowned; the winner picks their prize; Space at the results moves to the next cue
 //   4. Core Vessels on Auto: the Director deals (on GO), then plays the screens by itself, stops for the suspects,
-//      GO opens the audience vote, the game eliminates the audience's pick; Hold stops Auto; Back shows an earlier
-//      screen again and Esc returns to the live game
+//      the host taps them on their phone, GO opens the audience vote, the game eliminates the audience's pick; Hold
+//      stops Auto; Back shows an earlier screen again and Esc returns to the live game
 // Screenshots: screenshots/night-*.png. Exit code 0 = all good. Takes several minutes.
 //   node tools/launcher-check.mjs [--keep]      (--keep leaves the launcher open at the end)
 import { spawn, execSync } from 'node:child_process';
@@ -104,6 +105,19 @@ try {
     await con.click(`#seats [data-ci="${id}"]`); await sleep(250);
   }
   ok('the rest are marked by hand', /12 of 12/.test(await text('#ciCount')), await text('#ciCount'));
+  // the host's phone
+  const host = await phone('host');
+  const htext = (sel) => host.$eval(sel, (e) => e.textContent.trim()).catch(() => '');
+  const hshown = (sel) => host.$eval(sel, (e) => !e.classList.contains('hidden')).catch(() => false);
+  await host.goto(`${SITE}/host?s=${SHOW}`, { waitUntil: 'networkidle2' });
+  await host.type('#code', 'NOPE-1'); await host.click('#go');
+  ok('/host refuses a wrong code', !!(await waitFor(async () => /isn’t tonight’s/.test(await htext('#err')), 8000)), await htext('#err'));
+  await host.$eval('#code', (e) => { e.value = ''; });
+  await host.type('#code', showJson.hostCode); await host.click('#go');
+  ok('/host takes the host code and follows the show (standing by, the first cue next)', !!(await waitFor(async () => await hshown('#vLive')
+    && /Standing by/.test(await htext('#cueT')) && /Next · 101/.test(await htext('#nextLbl')) && /\bok\b/.test(await host.$eval('#dot', (d) => d.className)), 12000)),
+    `${await htext('#cueT')} · ${await htext('#nextLbl')}`);
+  ok('the console sees the host’s phone', !!(await waitFor(async () => /host phone live/.test(await text('#hvSt')), 12000)), await text('#hvSt'));
 
   // 2. the practice vote
   for (let k = 0; k < 7; k++) await space();   // 101 110 120 201 210 220 230
@@ -112,7 +126,12 @@ try {
   await fan.goto(`${SITE}/vote?s=${SHOW}`, { waitUntil: 'networkidle2' });
   await fanVotes(fan, 3);
   ok('the console counts the practice vote', !!(await waitFor(async () => /1 in/.test(await text('#vTotal')), 8000)), await text('#vTotal'));
+  const say230 = showJson.cues.find((c) => c.id === '230').say;
+  ok('the host’s phone has the cue and the line to say', !!(await waitFor(async () => /230/.test(await htext('#cueLbl')) && (await htext('#say')) === say230, 8000)), `${await htext('#cueLbl')} · ${await htext('#say')}`);
+  ok('the host’s phone sees the count before the room does', !!(await waitFor(async () => await hshown('#voteC') && /^1 vote$/.test(await htext('#voteTotal')) && await hshown('#votePractice'), 8000)), await htext('#voteTotal'));
+  await shot(host, 'host-practice');
   await space();
+  ok('the host knows who won', !!(await waitFor(async () => /wins|tie/.test(await htext('#voteState')), 8000)), await htext('#voteState'));
   ok('leaving the cue closes it', !!(await waitFor(async () => /Closed · 1 vote/.test(await text('#vTotal')), 8000)), await text('#vTotal'));
 
   // ---------------------------------------------------------------------------------------------
@@ -120,6 +139,8 @@ try {
   await space(); await space(); await space();   // 301 305 310
   ok('GO reaches the race cue', (await nowId()) === '310', await nowId());
   ok('the race cue shows the game track: the lobby', /Lobby/.test(await screenTitle()), await screenTitle());
+  ok('the host’s phone turns red, white and blue with the race’s screen on it', !!(await waitFor(async () =>
+    (await host.$eval('body', (b) => b.classList.contains('le'))) && (await htext('#gameLbl')) === 'Lesser Evil' && /Lobby/.test(await htext('#gameT')), 8000)), await htext('#gameT'));
   const leSeats = await waitFor(async () => { const ps = await db.players(LE); return CAST.every((c) => ps.some((p) => p.name === c[2])) ? ps : null; }, 30000, 1500);
   ok('the cast follow into the race and take their seats by name', !!leSeats, leSeats && leSeats.map((p) => p.name).join(', '));
   await space();
@@ -149,6 +170,8 @@ try {
         ok('a ballot keeps the game’s own board on the projector, with the vote panel beside it',
           (await dis.$eval('body', (b) => b.classList.contains('gameon'))) && !!(await dis.$('#stage .votepanel .tile .qr')), title);
         await shot(dis, 'le-ballot');
+        ok('the host’s phone has the ballot', !!(await waitFor(async () => await hshown('#voteC') && (await htext('#voteLbl')) === 'Audience ballot', 6000)), await htext('#voteLbl'));
+        await shot(host, 'host-le-ballot');
       }
       await fanVotes(fan, k); await sleep(1200);
       await space(); ballots++;
@@ -185,6 +208,8 @@ try {
       await wph.click('[data-x="lock"]');
     }
     ok('the winner locks in the Demon on their phone', !!(await waitFor(async () => /picked Demon/.test(await text('#prizeT')), 12000)), await text('#prizeT'));
+    ok('the host’s phone keeps the pick behind a button', !!(await waitFor(async () => /locked in/.test(await htext('#prizeT')) && await hshown('#peek')
+      && (await host.$eval('#peek', (b) => b.dataset.role)) === 'Demon' && !/Demon/.test(await htext('#prizeC')), 8000)), await htext('#prizeT'));
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -220,15 +245,31 @@ try {
   await key('Escape');
   ok('Esc returns to the live game', !(await dis.$eval('body', (b) => b.classList.contains('replaying'))));
   ok('Auto stops at the suspects', /discussion/i.test(await screenTitle()) && /2 or 3 suspects/i.test(await text('#gStepTxt')), await text('#gStepTxt'));
-  const names = await con.$$eval('#nomChips button', (b) => b.map((x) => x.textContent));
-  const pick = names.map((n, i) => [n, i]).filter(([n]) => !/bot/.test(n)).slice(0, 2);
-  for (const [, i] of pick) { await (await con.$$('#nomChips button'))[i].click(); await sleep(300); }
+  // the host picks the suspects on their phone
+  ok('the host’s phone has the suspects to tap, and the roles in play', !!(await waitFor(async () => await hshown('#susC') && (await host.$$('#sus button')).length >= 3
+    && /Demon/.test(await htext('#roles')), 10000)), await htext('#roles'));
+  await shot(host, 'host-suspects');
+  // the host might use a tablet: the same page in two columns
+  await host.setViewport({ width: 1180, height: 820, isMobile: true, hasTouch: true, deviceScaleFactor: 1 }); await sleep(500);
+  ok('on a tablet the host page goes two columns, the suspects beside the cue', await host.evaluate(() =>
+    document.getElementById('susC').getBoundingClientRect().left > document.querySelector('.cue').getBoundingClientRect().right));
+  await shot(host, 'host-suspects-tablet');
+  await host.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }); await sleep(300);
+  // two suspects who aren't the Demon, so the audience can't end the game on day 1 (the verdict and Hold come next)
+  const roleOf = Object.fromEntries((await db.players(CV)).map((p) => [String(p.id), p.role]));
+  const hn = (await host.$$eval('#sus button', (b) => b.filter((x) => !x.querySelector('small')).map((x) => x.dataset.id))).filter((id) => roleOf[id] !== 'host-demon');
+  for (const id of hn.slice(0, 2)) { await host.click(`#sus [data-id="${id}"]`); await sleep(400); }
+  ok('the host’s taps reach the console', !!(await waitFor(async () => (await con.$$eval('#nomChips button.on', (b) => b.map((x) => x.dataset.nom))).sort().join() === hn.slice(0, 2).sort().join(), 10000)),
+    await con.$$eval('#nomChips button.on', (b) => b.map((x) => x.textContent).join(', ')).catch(() => ''));
+  ok('the host’s phone shows them chosen', !!(await waitFor(async () => (await host.$$('#sus button.on:not(.wait)')).length === 2 && /Ready/.test(await htext('#susWhy')), 8000)), await htext('#susWhy'));
   await space();
   ok('GO opens the audience vote on the suspects', !!(await waitFor(voteOpen, 8000)), await screenTitle());
   ok('the vote screen covers the game on the projector', !(await dis.$eval('body', (b) => b.classList.contains('gameon'))) && !!(await dis.$('#stage .scr.vote')));
   await shot(dis, 'cv-vote');
   const cands = await fanVotes(fan, 0);
   ok('/vote shows the two suspects', cands && cands.length === 2, cands && cands.join(','));
+  ok('the host’s phone drops the suspects and shows the vote', !!(await waitFor(async () => !(await hshown('#susC')) && await hshown('#voteC') && (await htext('#voteLbl')) === 'Audience vote', 8000)), await htext('#voteLbl'));
+  await shot(host, 'host-cv-vote');
   const want = cands && showJson.cast.find((c) => c.id === cands[0]);
   const out = await waitFor(async () => { const g = await db.game(CV); return g && g.last_elimination && g.last_elimination.name ? g.last_elimination : null; }, 40000, 1000);
   ok('the vote closes on its clock and the game eliminates the audience’s pick', out && want && out.name === want.name, out && out.name);

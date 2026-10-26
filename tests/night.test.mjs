@@ -50,6 +50,7 @@ function fakeDb() {
       const lead = Object.keys(d.counts).filter((k) => d.counts[k] === top && top > 0);
       return { ok: true, result: { counts: d.counts, total, winner: lead.length === 1 ? lead[0] : null, tied: lead.length > 1 } };
     }),
+    setHost: (id, st) => rec('setHost', st, () => ({ ok: true, cmd: null, seen: null, now: Date.now() })),
     extendVote: (id, s) => rec('extendVote', { id, s }, { ok: true }),
     leBallot: () => rec('leBallot', null, () => d.ballot),
   });
@@ -143,6 +144,23 @@ test('practice vote: all the cast, flagged practice, closed by leaving its cue, 
   assert.equal(t.db.named('closeVote').length, 1);
   assert.equal(t.db.named('control').filter((c) => c.cmd === 'close_vote').length, 0);
   assert.equal(t.n._live.vote.result.winner, 'bram');
+});
+
+test('the host’s phone sees the vote’s counts while it’s open (by name), then who won', async () => {
+  const t = setup();
+  await t.n._tick(); await t.n._tick();
+  await t.go('230');
+  t.db.counts = { bram: 3, ava: 1 };
+  await t.n._tick();
+  const hosts = () => t.db.named('setHost').filter(Boolean);
+  let v = hosts().pop().vote;
+  assert.equal(v.state, 'open'); assert.equal(v.practice, true); assert.equal(v.total, 4);
+  assert.deepEqual(v.rows, [{ name: 'Ava', n: 1 }, { name: 'Bram', n: 3 }, { name: 'Cleo', n: 0 }]);
+  assert.ok(v.closesAt > Date.now());
+  await t.go('310');
+  v = hosts().pop().vote;
+  assert.equal(v.state, 'closed'); assert.equal(v.winner, 'Bram'); assert.equal(v.tied, false);
+  assert.ok(v.revealAt > Date.now(), 'the host knows before the room does');
 });
 
 test('Core Vessels: GO into the vote needs 2 or 3 suspects and the game at its vote; the counts go back by player id', async () => {

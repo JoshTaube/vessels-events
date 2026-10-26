@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#04040a">
+<title>Vessels · Host</title>
+<link rel="stylesheet" href="ev.css">
+<script src="event-config.js"></script>
+<script src="ev.js"></script>
+<style>
+  main { padding-top: 14px; gap: 12px; }
+  .bar { position: sticky; top: 0; z-index: 5; }
+  .bar .dot { position: absolute; right: 18px; top: calc(max(18px, env(safe-area-inset-top)) + 6px); width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); }
+  .bar .dot.ok { background: #6fdc8c; box-shadow: 0 0 12px rgba(111,220,140,.6); }
+  .bar .dot.bad { background: var(--demon); box-shadow: 0 0 12px rgba(224,82,79,.6); }
+  .codeform { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; margin: 0 auto; }
+
+  .card { border-radius: 20px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 10.5px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--lav); box-shadow: inset 0 0 0 1px rgba(176,123,255,.45); white-space: nowrap; }
+  .chip.auto { color: #6fdc8c; box-shadow: inset 0 0 0 1px rgba(111,220,140,.5); }
+  .chip.held { color: #ffc46b; box-shadow: inset 0 0 0 1px rgba(255,196,107,.55); }
+  .big { font-family: var(--cinzel); font-weight: 600; font-size: clamp(24px, 7.2vw, 30px); line-height: 1.12; letter-spacing: .03em; }
+  .mid-t { font-family: var(--cinzel); font-weight: 600; font-size: 19px; line-height: 1.2; letter-spacing: .03em; }
+  .sub { color: var(--text-2); font-size: 15px; line-height: 1.4; }
+  .quiet { color: var(--text-3); font-size: 13px; line-height: 1.4; }
+  .clock { font-family: var(--cinzel); font-weight: 700; font-size: 34px; letter-spacing: .04em; font-variant-numeric: tabular-nums; color: var(--lav); }
+  .clock.low { color: var(--demon); }
+  .clock.sm { font-size: 22px; }
+
+  /* the cue: the host's line is the biggest thing on the page */
+  .cue { background: rgba(176,123,255,.08); box-shadow: inset 0 0 0 1px rgba(176,123,255,.35); }
+  .say { font-family: var(--garamond); font-style: italic; font-size: clamp(25px, 7.4vw, 32px); line-height: 1.25; color: var(--text); }
+  .say::before { content: '“'; } .say::after { content: '”'; }
+  .say.none { font-style: normal; font-family: var(--ui); font-size: 15px; color: var(--text-3); }
+  .say.none::before, .say.none::after { content: ''; }
+  .next .say { font-size: 18px; color: var(--text-2); }
+
+  .alert { border-radius: 16px; padding: 14px 16px; font-weight: 700; font-size: 15px; letter-spacing: .04em; background: rgba(224,82,79,.16); box-shadow: inset 0 0 0 2px var(--demon); color: #ffd9d8; }
+  .alert b { display: block; font-size: 11px; letter-spacing: .24em; text-transform: uppercase; color: var(--demon); margin-bottom: 4px; }
+  .alert.warn { background: rgba(255,196,107,.12); box-shadow: inset 0 0 0 2px #ffc46b; color: #ffe9c7; }
+  .alert.warn b { color: #ffc46b; }
+
+  .status { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; color: var(--text-2); }
+  .status i { width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); flex: none; }
+  .status.ready i { background: #6fdc8c; box-shadow: 0 0 10px rgba(111,220,140,.6); }
+  .go { font-weight: 700; font-size: 14px; color: var(--lav); }
+  .go.blocked { color: #ffc46b; }
+
+  .bars { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+  .vr { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+  .vr .nm { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vr .n { font-family: var(--cinzel); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .vr .tr { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .vr .tr i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #7a4aa8, #d4a8f5); transition: width .4s; }
+  .vr.top .nm, .vr.top .n { color: var(--lav); }
+  .badge { align-self: flex-start; padding: 5px 11px; border-radius: 999px; font-weight: 700; font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: #ffc46b; box-shadow: inset 0 0 0 1px rgba(255,196,107,.5); }
+
+  .sus { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; margin-top: 4px; }
+  .sus button { min-height: 58px; border-radius: 16px; padding: 8px 10px; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line-2);
+    font-family: var(--cinzel); font-weight: 700; font-size: 16px; letter-spacing: .04em; line-height: 1.15; }
+  .sus button.on { background: rgba(176,123,255,.2); box-shadow: inset 0 0 0 2px var(--violet), 0 0 24px rgba(176,123,255,.25); color: #fff; }
+  .sus button.wait { box-shadow: inset 0 0 0 2px rgba(176,123,255,.6); opacity: .7; }
+  .sus button small { display: block; font-family: var(--ui); font-weight: 600; font-size: 10px; letter-spacing: .16em; color: var(--text-3); text-transform: uppercase; margin-top: 3px; }
+
+  .roles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .roles span { padding: 7px 12px; border-radius: 12px; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1px var(--line); font-family: var(--cinzel); font-weight: 700; font-size: 14px; letter-spacing: .05em; }
+  .roles span.demon { color: #ff8f8c; }
+  .peek { align-self: flex-start; padding: 8px 14px; border-radius: 12px; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1px var(--line-2); font-weight: 700; font-size: 13px; letter-spacing: .08em; color: var(--lav); }
+  .foot2 { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 8px; color: var(--text-3); font-size: 13px; text-align: center; }
+  .foot2 button { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* Lesser Evil's red, white and blue while the race is on */
+  body.le .card { background: rgba(245,241,232,.04); box-shadow: inset 0 0 0 1px rgba(245,241,232,.14); }
+  body.le .cue { background: rgba(34,70,140,.22); box-shadow: inset 0 0 0 1px rgba(245,241,232,.3); }
+  body.le .big, body.le .mid-t, body.le .clock, body.le .vr .n, body.le .sus button, body.le .roles span { font-family: var(--oswald); letter-spacing: .04em; }
+  body.le .clock { color: var(--le-cream); }
+  body.le .clock.low { color: #ff8f8c; }
+  body.le .chip, body.le .go, body.le .vr.top .nm, body.le .vr.top .n { color: var(--le-cream); }
+  body.le .chip { box-shadow: inset 0 0 0 1px rgba(245,241,232,.4); font-family: var(--oswald); }
+  body.le .vr .tr i { background: linear-gradient(90deg, #22468c, #b53131); }
+
+  /* the layout. A phone: one column, the cue first, then whatever the room is doing (the vote, the suspects), then
+     the game. A tablet: two columns, the script on the left (the cue, what's next, the game) and the room on the
+     right (the vote, the suspects, the prize, the MVP, the roles); the script alone, centred, when the room has
+     nothing to show. */
+  .live { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 1240px; margin: 0 auto; }
+  .alerts { display: flex; flex-direction: column; gap: 12px; }
+  .cols { display: flex; flex-direction: column; gap: 12px; }
+  .col { display: contents; }
+  .cue { order: 1; } #nextC { order: 2; } #voteC { order: 3; } #susC { order: 4; } #gameC { order: 5; } #prizeC { order: 6; } #mvpC { order: 7; } #rolesC { order: 8; }
+  @media (min-width: 720px) {
+    main { padding: 18px 24px max(24px, env(safe-area-inset-bottom)); }
+    .live, .cols { gap: 16px; }
+    .cols { flex-direction: row; align-items: flex-start; }
+    .col { display: flex; flex-direction: column; gap: 16px; flex: 1 1 0; min-width: 0; }
+    .cols.solo .room { display: none; }
+    .cols.solo .script { max-width: 860px; margin: 0 auto; }
+    .bar .dot { right: 26px; }
+  }
+  @media (min-width: 720px) and (orientation: landscape) { .col.script { flex-grow: 1.2; } }
+  @media (max-height: 500px) { .bar { position: static; } }   /* a landscape phone: the header scrolls away */
+  /* tablet type: bigger, for reading at arm's length on a stand (not on a landscape phone, which is short) */
+  @media (min-width: 720px) and (min-height: 600px) {
+    .bar .t { font-size: 22px; }
+    .bar .s { font-size: 12.5px; }
+    .card { padding: 20px 24px; gap: 10px; border-radius: 24px; }
+    .lbl { font-size: 12px; }
+    .say { font-size: clamp(32px, 3.6vw, 44px); }
+    .next .say { font-size: 22px; }
+    .mid-t { font-size: 24px; }
+    .big { font-size: clamp(30px, 3.2vw, 38px); }
+    .sub { font-size: 17px; }
+    .quiet, .status, .go { font-size: 15px; }
+    .clock { font-size: 46px; }
+    .clock.sm { font-size: 30px; }
+    .chip { font-size: 11.5px; padding: 5px 12px; }
+    .alert { font-size: 18px; padding: 16px 20px; }
+    .alert b { font-size: 12px; }
+    .vr .nm { font-size: 19px; }
+    .vr .n { font-size: 26px; }
+    .vr .tr { height: 10px; }
+    .bars { gap: 12px; }
+    .sus { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 12px; }
+    .sus button { min-height: 76px; font-size: 20px; border-radius: 18px; }
+    .sus button small { font-size: 11px; }
+    .roles span { font-size: 17px; padding: 9px 14px; }
+    .peek { font-size: 15px; padding: 11px 18px; }
+    .foot2 { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<!-- Vessels Events: THE HOST'S PHONE (Phase 3). The host enters the night's host code once. From then on this page
+     follows the launcher: the cue and the line to say, what's next, the clock, a safety card on the screen, the game's
+     screen and what GO does next, the audience vote's live counts (before the room sees them), the Lesser Evil prize,
+     the MVP and the roles in play. During Core Vessels' discussion the host taps the suspects. It asks the event
+     database every second or so; the screen stays awake where the phone allows it. -->
+<div class="bar"><div class="t" id="barT">VESSELS</div><div class="s" id="sub">Host</div><span class="dot" id="dot"></span></div>
+<main>
+  <section class="mid" id="vCode">
+    <div class="wm"><img src="ev/assets/vessels-wordmark.png" alt="Vessels"></div>
+    <div class="story" id="codeWhy">The show runs from here.</div>
+    <form class="codeform" id="form" autocomplete="off">
+      <div class="lbl">Enter the host code</div>
+      <input class="field" id="code" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="16" aria-label="Host code">
+      <button class="slab" id="go" type="submit">ENTER</button>
+      <div class="err" id="err"></div>
+    </form>
+    <div class="foot">The host code is on the run sheet.</div>
+  </section>
+
+  <section class="live hidden" id="vLive">
+    <div class="alerts" id="alerts">
+      <div class="alert warn hidden" id="offline"></div>
+      <div class="alert hidden" id="safety"></div>
+    </div>
+
+    <div class="cols" id="cols">
+    <div class="col script">
+    <div class="card cue">
+      <div class="row"><div class="lbl" id="cueLbl">Now</div><div class="clock" id="timer" data-end=""></div></div>
+      <div class="mid-t" id="cueT"></div>
+      <div class="lbl" style="margin-top:6px">Host says</div>
+      <div class="say" id="say"></div>
+    </div>
+
+    <div class="card next hidden" id="nextC">
+      <div class="lbl" id="nextLbl">Next</div>
+      <div class="sub" id="nextT"></div>
+      <div class="say" id="nextSay"></div>
+    </div>
+
+    <div class="card hidden" id="gameC">
+      <div class="row"><div class="lbl" id="gameLbl">The game</div><span class="chip" id="gameMode"></span></div>
+      <div class="big" id="gameT"></div>
+      <div class="sub" id="gameD"></div>
+      <div class="row"><div class="status" id="gameS"><i></i><span></span></div><div class="clock sm" id="gameClock" data-end=""></div></div>
+      <div class="go" id="gameGo"></div>
+    </div>
+    </div>
+
+    <div class="col room" id="room">
+    <div class="card hidden" id="voteC">
+      <div class="row"><div class="lbl" id="voteLbl">Audience vote</div><div class="clock sm" id="voteClock" data-end=""></div></div>
+      <span class="badge hidden" id="votePractice">Practice</span>
+      <div class="mid-t" id="votePrompt"></div>
+      <div class="sub" id="voteState"></div>
+      <div class="bars" id="voteRows"></div>
+      <div class="quiet" id="voteTotal"></div>
+    </div>
+
+    <div class="card hidden" id="susC">
+      <div class="row"><div class="lbl">Suspects</div><div class="chip" id="susN"></div></div>
+      <div class="sub" id="susWhy">Tap 2 or 3. The vote opens on the console.</div>
+      <div class="sus" id="sus"></div>
+    </div>
+
+    <div class="card hidden" id="prizeC">
+      <div class="lbl">Lesser Evil prize</div>
+      <div class="sub" id="prizeT"></div>
+      <button class="peek hidden" id="peek">Hold to see their pick</button>
+    </div>
+
+    <div class="card hidden" id="mvpC">
+      <div class="lbl">MVP so far</div>
+      <div class="sub" id="mvpT"></div>
+    </div>
+
+    <div class="card hidden" id="rolesC">
+      <div class="lbl">Roles in play</div>
+      <div class="roles" id="roles"></div>
+    </div>
+    </div>
+    </div>
+
+    <div class="foot2">
+      <div id="wake">Keep this page open</div>
+      <button id="out">Not the host? Sign out</button>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const qs = new URLSearchParams(location.search);
+  const KEY = 'ev_host';
+  const store = {
+    get: () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } },
+    set: (v) => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} },
+    del: () => { try { localStorage.removeItem(KEY); } catch (e) {} },
+  };
+  const saved0 = store.get();
+  const SHOW = (qs.get('s') || (window.VL_CONFIG && VL_CONFIG.show) || (saved0 && saved0.show) || '').toLowerCase();
+  let me = saved0 && saved0.show === SHOW && saved0.code ? saved0 : null;
+  let off = 0, last = null, pub = null, fails = 0, timer = null;
+  const wait = {};   // suspect taps on their way: id -> {on, at}
+  const ROLES = EV.ROLES || {};
+  const roleName = (k) => (ROLES[k] && ROLES[k][0]) || k;
+  const serverNow = () => Date.now() + off;
+  const clock = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  function view(v) { $('vCode').classList.toggle('hidden', v !== 'code'); $('vLive').classList.toggle('hidden', v !== 'live'); }
+
+  // ---- asking the database ----
+  function poll() {
+    clearTimeout(timer);
+    if (!me) return;
+    const t0 = Date.now();
+    EV.rpc('ev_host', { p_show: SHOW, p_code: me.code, p_device: EV.device() }).then((r) => {
+      if (!r || !r.ok) { signOut('That host code isn’t tonight’s. Enter it again.'); return; }
+      const t1 = Date.now();
+      if (r.now) off = r.now - (t0 + t1) / 2;
+      fails = 0; pub = r.pub || null;
+      if (r.name) $('sub').textContent = 'Host · ' + r.name;
+      last = r.state || null;
+      render();
+      later();
+    }, () => { fails++; render(); later(); });
+  }
+  const later = () => { clearTimeout(timer); timer = setTimeout(poll, document.visibilityState === 'visible' ? 1100 : 5000); };
+
+  function signOut(why) {
+    store.del(); me = null; last = null; clearTimeout(timer);
+    $('codeWhy').textContent = why || 'The show runs from here.';
+    $('code').value = ''; view('code'); $('dot').className = 'dot';
+  }
+
+  // ---- what the host sees ----
+  function render() {
+    const st = last || {};
+    const stale = pub && serverNow() - pub > 8000;
+    $('dot').className = 'dot ' + (fails >= 3 || stale ? 'bad' : last ? 'ok' : '');
+    const off1 = $('offline');
+    if (fails >= 3) { off1.innerHTML = '<b>No connection</b>Trying again. The show carries on without this phone.'; off1.classList.remove('hidden'); }
+    else if (!last || stale) {
+      off1.innerHTML = '<b>Launcher offline</b>' + (pub ? 'Last heard from ' + clock(serverNow() - pub) + ' ago.' : 'Waiting for the launcher to open tonight’s show.');
+      off1.classList.remove('hidden');
+    } else off1.classList.add('hidden');
+
+    const le = !!((st.game && st.game.le) || (st.cue && st.cue.segment === 'Lesser Evil'));
+    document.body.classList.toggle('le', le);
+    $('barT').textContent = le ? 'LESSER EVIL' : 'VESSELS';
+
+    // a safety card on the projector, and anyone reconnecting
+    const sf = [];
+    if (st.safety) sf.push('<b>On the screen</b>' + esc(st.safety));
+    if (st.reconnecting && st.reconnecting.length) sf.push('<b>Reconnecting</b>' + esc(st.reconnecting.join(', ')));
+    $('safety').innerHTML = sf.join('<div style="height:8px"></div>');
+    $('safety').classList.toggle('hidden', !sf.length);
+
+    // the cue and the line
+    const c = st.cue;
+    $('cueLbl').textContent = c ? 'Now · ' + c.id : 'Now';
+    $('cueT').textContent = c ? c.title : (st.started === false || !last ? 'Standing by. The show hasn’t started.' : '');
+    const say = c && c.say;
+    $('say').textContent = say || 'Nothing to say on this cue';
+    $('say').classList.toggle('none', !say);
+    $('timer').dataset.end = st.timer && st.timer.endsAt ? st.timer.endsAt : '';
+    const n = st.next;
+    $('nextC').classList.toggle('hidden', !n);
+    if (n) {
+      $('nextLbl').textContent = 'Next · ' + n.id + (n.kind === 'loop' ? ' · again' : '');
+      $('nextT').textContent = n.title;
+      $('nextSay').textContent = n.say || '';
+      $('nextSay').classList.toggle('hidden', !n.say);
+    }
+
+    renderVote(st.vote);
+    renderSuspects(st.suspects);
+    renderGame(st.game);
+
+    // the prize, the MVP, the roles
+    const z = st.prize;
+    $('prizeC').classList.toggle('hidden', !z);
+    if (z) {
+      $('prizeT').innerHTML = z.nobody ? '<b>' + esc(z.name) + '</b> won Lesser Evil. Not in the cast, so Vessels deals at random.'
+        : '<b>' + esc(z.name) + '</b> won Lesser Evil. ' + (z.pick ? 'Their role is locked in. Keep it secret.' : z.used ? 'Dealt at random.' : 'They’re choosing a role on their phone.');
+      $('peek').classList.toggle('hidden', !z.pick);
+      $('peek').dataset.role = z.pick ? roleName(z.pick) : '';
+    }
+    const m = st.mvp;
+    $('mvpC').classList.toggle('hidden', !m);
+    if (m) $('mvpT').innerHTML = m.players.map((p) => '<b>' + esc(p.name) + '</b> · ' + p.skill + ' skill points').join('<br>') + (m.games > 1 ? '<br><span class="quiet">After ' + m.games + ' games</span>' : '');
+    const rs = st.roles;
+    $('rolesC').classList.toggle('hidden', !(rs && rs.length));
+    if (rs) $('roles').innerHTML = rs.map((k) => '<span class="' + (k === 'host-demon' ? 'demon' : '') + '">' + esc(roleName(k)) + '</span>').join('');
+    // the layout: no empty gap where no banner is up; on a tablet, the script alone when the room has nothing to show
+    $('alerts').classList.toggle('hidden', $('offline').classList.contains('hidden') && $('safety').classList.contains('hidden'));
+    $('cols').classList.toggle('solo', !$('room').querySelector('.card:not(.hidden)'));
+    tick();
+  }
+
+  function renderVote(v) {
+    $('voteC').classList.toggle('hidden', !v);
+    if (!v) return;
+    $('voteLbl').textContent = v.game === 'le' ? 'Audience ballot' : v.game === 'cv' ? 'Audience vote' : 'Practice vote';
+    $('votePractice').classList.toggle('hidden', !v.practice);
+    $('votePrompt').textContent = v.prompt || '';
+    const open = v.state === 'open';
+    $('voteClock').dataset.end = open && v.closesAt ? v.closesAt : '';
+    const top = Math.max(0, ...v.rows.map((r) => r.n)), most = Math.max(1, top);
+    $('voteRows').innerHTML = v.rows.map((r) => '<div class="vr' + (r.n && r.n === top ? ' top' : '') + '"><div class="nm">' + esc(r.name) + '</div><div class="n">' + r.n
+      + '</div><div class="tr"><i style="width:' + Math.round(100 * r.n / most) + '%"></i></div></div>').join('');
+    $('voteTotal').textContent = v.total === 1 ? '1 vote' : v.total + ' votes';
+    const before = v.revealAt && serverNow() < v.revealAt;
+    $('voteState').innerHTML = open ? 'Voting now. Only you can see the counts.'
+      : (v.tied ? 'Closed. <b>A tie.</b> Call it out loud.' : v.winner ? 'Closed. <b>' + esc(v.winner) + '</b> wins.' : 'Closed. No votes.')
+        + (before ? ' The room sees it in a moment.' : '');
+  }
+
+  function renderSuspects(list) {
+    $('susC').classList.toggle('hidden', !list);
+    if (!list) return;
+    const now = Date.now();
+    for (const id in wait) { const p = list.find((x) => x.id === id); if (!p || p.on === wait[id].on || now - wait[id].at > 5000) delete wait[id]; }
+    const on = list.filter((p) => (wait[p.id] ? wait[p.id].on : p.on)).length;
+    $('susN').textContent = on + ' chosen';
+    $('susWhy').textContent = on >= 2 && on <= 3 ? 'Ready. The vote opens on the console.' : on > 3 ? 'Too many. Keep 2 or 3.' : 'Tap 2 or 3 suspects.';
+    $('sus').innerHTML = list.map((p) => {
+      const w = wait[p.id], isOn = w ? w.on : p.on;
+      return '<button data-id="' + esc(p.id) + '" class="' + (isOn ? 'on' : '') + (w ? ' wait' : '') + '">' + esc(p.name) + (p.bot ? '<small>Bot</small>' : '') + '</button>';
+    }).join('');
+  }
+
+  function renderGame(g) {
+    $('gameC').classList.toggle('hidden', !g);
+    if (!g) return;
+    $('gameLbl').textContent = g.name;
+    const mode = g.held ? 'held' : g.mode === 'auto' ? 'auto' : 'manual';
+    $('gameMode').textContent = mode === 'held' ? 'Held' : mode === 'auto' ? 'Auto' : 'Manual';
+    $('gameMode').className = 'chip ' + (mode === 'manual' ? '' : mode);
+    $('gameT').textContent = g.end ? 'Game over' : g.title;
+    $('gameD').textContent = g.detail || '';
+    $('gameD').classList.toggle('hidden', !g.detail);
+    $('gameS').className = 'status' + (g.ready ? ' ready' : '');
+    $('gameS').lastChild.textContent = g.ready ? 'Ready' : (g.why || 'Waiting');
+    $('gameClock').dataset.end = g.clock || '';
+    $('gameGo').textContent = g.next ? (g.blocked ? g.next : 'Next GO: ' + g.next) : '';
+    $('gameGo').className = 'go' + (g.blocked ? ' blocked' : '');
+  }
+
+  // the clocks, between polls
+  function tick() {
+    for (const id of ['timer', 'voteClock', 'gameClock']) {
+      const el = $(id), end = +(el.dataset.end || 0);
+      if (!end) { el.textContent = ''; continue; }
+      const left = end - serverNow();
+      el.textContent = clock(left);
+      el.classList.toggle('low', left < 10000);
+    }
+  }
+  setInterval(tick, 250);
+
+  // ---- the host's taps ----
+  $('sus').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-id]'); if (!b || !me) return;
+    const id = b.dataset.id, p = ((last && last.suspects) || []).find((x) => x.id === id); if (!p || wait[id]) return;
+    wait[id] = { on: !p.on, at: Date.now() };
+    renderSuspects(last.suspects);
+    if (navigator.vibrate) try { navigator.vibrate(12); } catch (x) {}
+    EV.rpc('ev_host_cmd', { p_show: SHOW, p_code: me.code, p_device: EV.device(), p_cmd: { type: 'nominee', id, on: wait[id].on } })
+      .then((r) => { if (!r || !r.ok) { delete wait[id]; renderSuspects(last.suspects); } }, () => { delete wait[id]; renderSuspects(last.suspects); });
+  });
+  // the prize pick is the winner's secret: shown only while the host holds the button
+  const peek = $('peek');
+  const showPick = () => { peek.textContent = peek.dataset.role || ''; };
+  const hidePick = () => { peek.textContent = 'Hold to see their pick'; };
+  peek.addEventListener('pointerdown', showPick);
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((k) => peek.addEventListener(k, hidePick));
+  peek.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ---- the screen stays awake ----
+  let lock = null;
+  function wake() {
+    if (!('wakeLock' in navigator)) { $('wake').textContent = 'Keep this page open, and keep the screen from locking'; return; }
+    if (lock || document.visibilityState !== 'visible' || !me) return;
+    navigator.wakeLock.request('screen').then((l) => {
+      lock = l; $('wake').textContent = 'The screen stays on while this page is open';
+      l.addEventListener('release', () => { lock = null; $('wake').textContent = 'Keep this page open'; });
+    }, () => { $('wake').textContent = 'Keep this page open, and keep the screen from locking'; });
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { wake(); poll(); } });
+  document.addEventListener('click', wake);
+
+  // ---- the code ----
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = $('code').value.trim().toUpperCase();
+    if (!code) { $('err').textContent = 'Enter the host code'; return; }
+    $('go').disabled = true; $('err').textContent = '';
+    EV.rpc('ev_host', { p_show: SHOW, p_code: code, p_device: EV.device() }).then((r) => {
+      $('go').disabled = false;
+      if (!r || !r.ok) { $('err').textContent = 'That isn’t tonight’s host code'; return; }
+      me = { show: SHOW, code }; store.set(me);
+      view('live'); wake(); poll();
+    }, () => { $('go').disabled = false; $('err').textContent = 'No connection. Try again'; });
+  });
+  $('code').addEventListener('input', () => { $('err').textContent = ''; });
+  $('out').addEventListener('click', () => signOut());
+
+  if (!SHOW) { $('codeWhy').textContent = 'Open the host link from the run sheet.'; $('form').classList.add('hidden'); view('code'); return; }
+  if (me) { view('live'); render(); wake(); poll(); } else view('code');
+})();
+</script>
+</body>
+</html>

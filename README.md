@@ -4,9 +4,9 @@ The desktop show launcher for live Vessels nights (Dojo Disco). The operator run
 laptop screen, the audience display full screen on the projector. The plan for every phase is in
 [docs/launcher-plan.md](docs/launcher-plan.md).
 
-**Status: Phase 2 with the Director** (the games, played by the launcher; the cast phones; the audience vote), on top of Phase 1 (two windows, projector
-detection, show files, the cue engine with GO, loops, locks and safety cues). Music, the Stream Deck, the host's
-phone page and the load test come in Phases 3 to 5.
+**Status: Phase 3** (the host's phone), on top of Phase 2 with the Director (the games, played by the launcher; the
+cast phones; the audience vote) and Phase 1 (two windows, projector detection, show files, the cue engine with GO,
+loops, locks and safety cues). Music, the Stream Deck and the load test come in Phases 4 and 5.
 
 What Phase 2 does:
 - **The games run in the projector window.** The launcher hosts Lesser Evil and Vessels (the event build of
@@ -36,6 +36,14 @@ What Phase 2 does:
   Girl). The first Vessels deal waits for the pick and seats it; a replay deals at random.
 - **The MVP** (cue 610): the best Vessels skill points of the night, from the game's own scoring. A tie shows
   co-MVPs.
+- **The host's phone** at **vessels-events.netlify.app/host** with the show's host code (once; the phone remembers
+  it): the cue and the line to say, big; what's next; the cue's clock; a safety card that's on the projector, and
+  who's reconnecting; the game's screen and what Space does next; the audience vote's live counts, and who won a few
+  seconds before the room sees it; the Lesser Evil prize (the winner's pick stays behind a hold-to-see button); the
+  MVP; the roles in play. During Core Vessels' discussion the host taps 2 or 3 suspects right there, and the console
+  sees them at once. The screen stays on while the page is open (where the phone allows it). The console's host card
+  says whether the host's phone is in, and gives its address and code. On a tablet the page goes two columns: the
+  script on the left (the cue, what's next, the game), the room on the right (the vote, the suspects, the prize).
 - **No Scholar** on event nights: their power is a second vote, and the cast doesn't vote. A full table of 12 is
   Demon, Priest, Nun, Anointed, Vanquisher and seven Townsfolk. (Production keeps its Scholar.)
 
@@ -71,6 +79,7 @@ and the saved show somewhere else, `--offline` never touches the event database.
    anything that still points at production.
 2. Open the launcher on the night's show. The game panel turns **Online** and the Lesser Evil lobby appears.
 3. Hand each cast member their code card. Seats light as they check in. Click a seat to mark a dead phone by hand.
+4. Give the host the host page and code (the console's host card shows both). The card turns *host phone live*.
 
 ## Try Phase 2 (about 20 minutes, with 3 or 4 phones)
 
@@ -92,9 +101,14 @@ and the saved show somewhere else, `--offline` never touches the event database.
 7. Double-click **401 Intermission**: the Vessels TV opens its room and the cast phones follow into its lobby. GO to
    **505 The game**, press **A** for Auto and Space to deal. Auto plays the game screen by screen (the story, the
    reveal, each introduction, the night, the dawn, the testimony) and stops at the discussion: pick 2 or 3 suspects
-   on the console and press Space. The audience votes; the vote closes on its clock and the game eliminates their
-   pick. **H** holds Auto on a screen; **Shift+Backspace** shows the previous screen again; **A** back to Manual.
+   on the console (or tap them on the host's phone) and press Space. The audience votes; the vote closes on its
+   clock and the game eliminates their pick. **H** holds Auto on a screen; **Shift+Backspace** shows the previous
+   screen again; **A** back to Manual.
 8. **610** shows the MVP once a game of Vessels has ended.
+
+Add a host phone any time: open vessels-events.netlify.app/host and enter `HOST-9KX` (the sample's host code). It
+follows every step above: the line to say, the vote counts, the game's screen, and the suspects to tap at the
+discussion.
 
 ## Tests
 
@@ -107,13 +121,14 @@ npm run check:night      # the whole night online: the real launcher, the event 
 
 `check:night` plays the night the way the operator does: the practice vote, a full Lesser Evil race with Space
 alone on Manual (checking nothing moves on its own), the prize pick, then Core Vessels on Auto up to and through its
-first audience vote, with Hold and Back. It takes several minutes. Screenshots land in `screenshots/night-*.png`.
+first audience vote, with Hold and Back. A host phone follows along and picks the suspects. It takes several
+minutes. Screenshots land in `screenshots/night-*.png`.
 The smoke test always uses a throwaway data folder and `--display=none`, so it never takes over a second monitor.
 
 ## Show files
 
-One JSON per night (format `vessels-show/1`): the cast (names, photos, private codes), the host code, the Lesser
-Evil prompts, the music bank, the media, the cue list. Paths are relative to the file. See
+One JSON per night (format `vessels-show/1`): the cast (names, photos, private codes), the host code (`hostCode`,
+for /host), the Lesser Evil prompts, the music bank, the media, the cue list. Paths are relative to the file. See
 `shows/sample-show/show.json` and section 4 of the plan. Phase 2 adds, per cue: `engine` (a game step taken on
 entry, e.g. `"start"` on each game's first cue) and `cast` (`"le"`, `"cv"` or `"none"`: where the cast phones go,
 otherwise decided by the segment). `lesserEvil.prompts` replace the game's own topics bank by bank;
@@ -133,7 +148,7 @@ Defaults are in `main/director.js`.
 - `src/`: the cue engine and the show file loader (no Electron, unit-tested)
 - `renderer/`: the console, the audience display, the shared Vessels look and screens, bundled fonts and logos
 - `web/`: the event site build (`build-event.js` generates it from production, `event-patches.js` are the anchored
-  patches, `site/` the event-only pages /cast and /vote, `functions/` the cached current-vote function, `sql/` the
+  patches, `site/` the event-only pages /cast, /vote and /host, `functions/` the cached current-vote function, `sql/` the
   event database, in order)
 - `shows/`: show files
 - `tools/`: the smoke test, the live checks, `ev-cli.mjs` (the event database from the command line)

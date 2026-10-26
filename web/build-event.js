@@ -96,7 +96,7 @@
   };
 
   // Event-only files, from web/site/ (or web/ for the modules shared with Vessels Live).
-  B.LOCAL = ['cast.html', 'vote.html', 'ev.js', 'ev.css', 'audience-bridge.js', 'event-mode.js'];
+  B.LOCAL = ['cast.html', 'vote.html', 'host.html', 'ev.js', 'ev.css', 'audience-bridge.js', 'event-mode.js'];
   // Injected ahead of every prod surface's own inline script.
   B.EVENT_MODULES = ['audience-bridge.js', 'event-mode.js', 'event-config.js', 'ev.js'];
 
@@ -106,11 +106,13 @@
     if (!cfg || !cfg.supabaseUrl || !cfg.anonKey) throw new Error('config needs supabaseUrl and anonKey');
     if (!/^https:\/\//.test(String(cfg.site || ''))) throw new Error('config needs site (the event site, https://...)');
     return { url: cfg.supabaseUrl, anonKey: cfg.anonKey, site: String(cfg.site).replace(/\/$/, ''), storeLinks: cfg.storeLinks || {},
-      show: showId || null };   // tonight (the site is built per night): /cast and /vote fall back to it
+      show: showId || null };   // tonight (the site is built per night): /cast, /vote and /host fall back to it
   };
 
-  // Netlify routing: the cast hub and the vote page at short addresses. (/api/now is the function's own path.)
-  B.REDIRECTS = '/cast  /cast.html  200\n/cast/  /cast.html  200\n/vote  /vote.html  200\n/vote/  /vote.html  200\n';
+  // Netlify routing: the cast hub, the vote page and the host's phone at short addresses. (/api/now is the
+  // function's own path.)
+  B.REDIRECTS = '/cast  /cast.html  200\n/cast/  /cast.html  200\n/vote  /vote.html  200\n/vote/  /vote.html  200\n'
+    + '/host  /host.html  200\n/host/  /host.html  200\n';
   // Cast photos and the roster change only between nights; the current-vote function sets its own cache.
   B.HEADERS = '/shows/*\n  Cache-Control: public, max-age=300\n';
 

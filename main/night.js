@@ -225,6 +225,7 @@ function make(o) {
     // then, on what the polls just learned (a room that has just opened): where the phones go, S6, the prize
     await Promise.all([writeLive(state, cue), redo(state), prize()]);
     await direct(cue);
+    if (due('host', 1000)) await publishHost();
   }
 
   async function pollCast() {
@@ -652,7 +653,74 @@ function make(o) {
         pick: (live.prize && live.prize.cast_id === saved.leWinner.cast_id && live.prize.pick) || null,
         sent: !!saved.pickSent, used: !!saved.pickUsed } : null,
       prizeNobody: !saved.leWinner && saved.leWinnerOther ? saved.leWinnerOther : null,   // a bot won the race
+      host: { seen: host.seen, live: !!host.seen && Date.now() - host.seen < 8000 },   // the host's phone
     });
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // THE HOST VIEW (Phase 3): what the host's phone (/host) shows, published whenever it changes. Times go out in the
+  // database's clock (the phone knows its own offset to it), so the countdowns on the phone match the room's. The
+  // reply carries the host's last tap: during Core Vessels' discussion they can choose the suspects.
+  const host = { cue: null, published: '', at: 0, skew: 0, seen: null, cmdN: null };
+  function setHostCue(h) { host.cue = h; }
+  function hostState() {
+    const { state, cue } = lastCtx, sk = (t) => (t ? t + host.skew : null);
+    const g = gameOf(cue) || (state && state.started && segOf(cue) >= 4 ? 'cv' : 'le');
+    const v = live.vote, ds = dir.screen, cast = show.cast;
+    const nameOf = (id) => (v && v.labels && v.labels[id]) || (cast.find((c) => c.id === id) || {}).name || id;
+    const c = host.cue || {};
+    const out = {
+      started: !!c.started, cue: c.cue || null, next: c.next || null, safety: c.safety || null, reconnecting: c.reconnecting || [],
+      timer: c.timer ? { endsAt: sk(c.timer.endsAt) } : null,
+      game: ds ? { name: g === 'le' ? 'Lesser Evil' : 'Vessels', le: g === 'le', title: ds.title, detail: ds.detail || '', ready: !!ds.ready, why: ds.why || '',
+        clock: sk(ds.clock), next: ds.go ? (ds.blocked || ds.go.label) : null, blocked: !!ds.blocked, end: !!ds.end, mode: dirMode(), held: dir.held } : null,
+      vote: v && (v.state !== 'closed' || Date.now() - (v.revealAt || 0) < 60000) ? {
+        prompt: v.prompt || '', game: v.game, practice: !!v.practice, state: v.state, closesAt: sk(v.closesAt), revealAt: sk(v.revealAt),
+        total: v.total || 0, rows: v.candidates.map((id) => ({ name: nameOf(id), n: (v.counts && v.counts[id]) || 0 })),
+        winner: v.result && v.result.winner ? nameOf(v.result.winner) : null, tied: !!(v.result && v.result.tied) } : null,
+      suspects: g === 'cv' && ds && /:discussion$/.test(ds.key)
+        ? alive().map((p) => ({ id: String(p.id), name: p.name, bot: !!p.is_bot, on: live.nominees.includes(String(p.id)) })) : null,
+      prize: saved.leWinner ? { name: saved.leWinner.name, pick: (live.prize && live.prize.cast_id === saved.leWinner.cast_id && live.prize.pick && live.prize.pick.role) || null, used: !!saved.pickUsed }
+        : saved.leWinnerOther ? { name: saved.leWinnerOther, nobody: true } : null,
+      mvp: (() => { const m = mvp(); return m && m.players.length ? { games: m.games, players: m.players.map((p) => ({ name: p.name, skill: p.skill })) } : null; })(),
+      roles: g === 'cv' ? dealFor(Math.max(6, (live.players.cv || []).length || show.cast.length)) : null,
+    };
+    return out;
+  }
+  // every second: the state when it changed (null keeps what the phone has: it's only asking for the host's taps)
+  async function publishHost() {
+    if (!show || !db || !saved.registered) return;
+    const st = hostState(), sig = JSON.stringify(st), fresh = sig !== host.published || Date.now() - host.at > 20000;
+    const r = await run('host', () => db.setHost(show.id, fresh ? Object.assign({ at: Date.now() + host.skew }, st) : null));
+    if (!r || !r.ok) return;
+    if (fresh) { host.published = sig; host.at = Date.now(); }
+    // the database clock, less this laptop's: kept unless it moves (a few ms of network wobble would republish every second)
+    if (r.now && Math.abs(r.now - Date.now() - host.skew) > 250) host.skew = r.now - Date.now();
+    if (r.seen !== host.seen) { host.seen = r.seen; changed(); }
+    hostCommand(r.cmd);
+  }
+  // the host's taps: a suspect chosen (or dropped) during Core Vessels' discussion. Each tap is numbered and the
+  // database keeps the last 20, so two quick taps between reads both land; each one this launcher hasn't seen yet is
+  // acted on, in order (the first reply after a start only sets where we are: an old tap is never replayed)
+  function hostCommand(cmd) {
+    const n = cmd && +cmd.n;
+    if (!n) { if (host.cmdN == null) host.cmdN = 0; return; }
+    if (host.cmdN == null) { host.cmdN = n; return; }
+    if (n <= host.cmdN) return;
+    const seen = host.cmdN;
+    host.cmdN = n;
+    for (const c of (Array.isArray(cmd.list) ? cmd.list : [cmd]).filter((x) => +x.n > seen).sort((a, b) => a.n - b.n)) hostTap(c);
+  }
+  function hostTap(c) {
+    if (c.type !== 'nominee' || c.id == null) return;
+    const ds = dir.screen, id = String(c.id);
+    if (!(ds && /:discussion$/.test(ds.key))) { log('host: a suspect tap outside the discussion, ignored'); return; }
+    if (!alive().some((p) => String(p.id) === id)) return;
+    // the tap says what the host wants (on or off), so a tap from a screen a moment behind can't flip it back
+    const want = typeof c.on === 'boolean' ? c.on : !live.nominees.includes(id);
+    if (want !== live.nominees.includes(id)) toggleNominee(id);
+    log(`host: suspect ${id} ${want ? 'chosen' : 'dropped'}`);
+    host.published = '';   // the host sees their tap land at once
   }
 
   function stop() { clearInterval(timer); timer = null; }
@@ -661,7 +729,7 @@ function make(o) {
 
   const directorOn = (cue) => directing(cue) && !!db;
   return { attach, reset, engines, cueChanged, setContext, preflight, engineStep, toggleNominee, closeVote, extendVote, voteOpen, snapshot, stop, pickFor,
-    directorGo, setDirMode, holdDir, directorOn,
+    directorGo, setDirMode, holdDir, directorOn, setHostCue,
     // for the tests
     _live: live, _saved: () => saved, _tick: tick };
 }

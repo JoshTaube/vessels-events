@@ -220,7 +220,11 @@ section { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 #mvpTxt { font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
 #mvpTxt b { font-family: var(--cinzel); color: var(--lav); }
 
-/* host view mirror: what the host's phone shows (Phase 3 builds the phone page) */
+/* host view mirror: the heart of what the host's phone (/host) shows, and whether that phone is in */
+.hvst { float: right; letter-spacing: .12em; color: var(--text-4); font-weight: 600; }
+.hvst.ok { color: #3ddc6e; }
+.hvst.ok::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #3ddc6e; margin-right: 6px; vertical-align: 1px; box-shadow: 0 0 8px rgba(61,220,110,.6); }
+.hvurl { margin-top: 8px; font-size: 11.5px; color: var(--text-3); text-align: center; letter-spacing: .02em; user-select: text; }
 .phone { padding: 14px; border-radius: 20px; background: radial-gradient(120% 80% at 50% 0%, rgba(176,127,224,.14), rgba(0,0,0,0) 60%), #04040a; box-shadow: inset 0 0 0 1px var(--line-2); text-align: center; }
 .hv-cue { font-family: var(--cinzel); font-weight: 700; font-size: 20px; letter-spacing: .05em; color: var(--lav); }
 .hv-line { margin-top: 8px; font-family: var(--garamond); font-style: italic; font-size: 19px; line-height: 1.3; color: var(--text); }

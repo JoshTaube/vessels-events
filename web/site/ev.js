@@ -99,6 +99,7 @@
     hunter: ['Vanquisher', 'Strike one player, once per game'],
     townsfolk: ['Townsfolk', 'No ability. Just your wits'],
   };
+  EV.ROLES = ROLES;   // /host names the roles in play the same way
   let _prize = { el: null, hideUntil: 0, sel: null, armed: false, done: false };
   const css = 'position:fixed;inset:0;z-index:2147483000;overflow-y:auto;background:radial-gradient(120% 70% at 50% 0%,rgba(176,127,224,.22),rgba(4,4,10,0) 60%),#04040A;'
     + 'color:#f4f0fa;font-family:Inter,system-ui,sans-serif;padding:max(22px,env(safe-area-inset-top)) 20px 28px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;-webkit-user-select:none;user-select:none';

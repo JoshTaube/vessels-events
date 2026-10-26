@@ -177,8 +177,8 @@ function vessels(game, players, vote, opts) {
     }
     if (f && f.status === 'discussion') {
       const ok = noms.length >= 2 && noms.length <= 3;
-      return S({ key: `${base}:discussion`, title: `Day ${n}: discussion`, detail: ok ? `Suspects: ${noms.map((id) => nameOf(ps, id)).join(', ')}` : 'Pick 2 or 3 suspects on the console',
-        ready: ok, why: ok ? '' : 'Pick 2 or 3 suspects', go: { action: 'vote-open', label: 'Open the audience vote' }, blocked: ok ? null : 'Pick 2 or 3 suspects on the console first', manual: true });
+      return S({ key: `${base}:discussion`, title: `Day ${n}: discussion`, detail: ok ? `Suspects: ${noms.map((id) => nameOf(ps, id)).join(', ')}` : 'The console or the host’s phone picks them',
+        ready: ok, why: ok ? '' : 'Pick 2 or 3 suspects', go: { action: 'vote-open', label: 'Open the audience vote' }, blocked: ok ? null : 'Pick 2 or 3 suspects first', manual: true });
     }
     if (f && f.playerId) {
       const said = f.status === 'locked' || f.status === 'passed';

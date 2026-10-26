@@ -50,6 +50,8 @@ function make(cfg, opts) {
     tally: (voteId) => rpc('ev_tally', { p_key: K, p_vote: voteId }),
     closeVote: (voteId, revealMs) => rpc('ev_close_vote', { p_key: K, p_vote: voteId, p_reveal_ms: revealMs == null ? 4000 : revealMs }),
     dropShow: (showId) => rpc('ev_drop_show', { p_key: K, p_show: showId }),
+    // the host's phone (/host): publish what it shows; the reply carries the host's last tap and when they were seen
+    setHost: (showId, st) => rpc('ev_set_host', { p_key: K, p_show: showId, p_state: st }),
     // a test bot in a Lesser Evil race: seated the way a joining phone seats itself (a racer with a slogan). It never
     // has to act: every move a racer makes has a GO fallback in the Director (a random pick, a host-run clock...)
     addLeBot: (room, name, slogan) => call('/rest/v1/players', { method: 'POST', headers: { Prefer: 'return=representation' },

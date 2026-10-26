@@ -110,6 +110,13 @@
     $('hvCue').textContent = c ? `${c.id} · ${fill(c.title, c, st)}` : 'Standing by';
     $('hvLine').textContent = say || '';
     $('hvNext').textContent = n ? `Next: ${n.id} ${fill(n.title, n, st)}${n.say ? ' · “' + fill(n.say, n, st) + '”' : ''}` : '';
+    // the host's own phone (/host): in or not, and where it goes
+    const H = p.live && p.live.host, ago = H && H.seen ? Math.max(0, Math.round((p.now - H.seen) / 1000)) : 0;
+    $('hvSt').textContent = !show.hostCode ? 'no host code' : !p.live || !p.live.online ? '' : H && H.live ? 'host phone live'
+      : H && H.seen ? `host phone last seen ${ago < 90 ? ago + ' s' : Math.round(ago / 60) + ' min'} ago` : 'host phone not in yet';
+    $('hvSt').className = 'hvst' + (H && H.live ? ' ok' : '');
+    $('hvUrl').textContent = !show.hostCode ? 'Add "hostCode" to the show file to give the host their phone view'
+      : show.audience ? `${show.audience.url.replace(/^https:\/\//, '').replace(/\/vote\/?$/, '')}/host · code ${show.hostCode}` : '';
     tick();
   }
 

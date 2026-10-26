@@ -76,12 +76,14 @@ const SHOW = { id: 'test-night', name: 'T', cast: [{ id: 'ava', name: 'Ava' }, {
   cues: [{ id: '101', title: 'Doors', screen: { type: 'menu-loop' } }, { id: '501', title: 'Vessels', screen: { type: 'title' } },
     { id: '505', title: 'The game', screen: { type: 'game', game: 'vessels' } }, { id: '601', title: 'Curtain', screen: { type: 'card' } }] };
 function setup() {
-  const calls = [], games = {}, players = {}, m = {};
+  const calls = [], games = {}, players = {}, m = {}, host = {};
   const rec = (n, a, r) => { calls.push([n, a]); return Promise.resolve(typeof r === 'function' ? r() : r); };
   const db = { registerShow: () => rec('reg', null, { ok: true }), control: (room, row) => rec('control', Object.assign({ room }, row), [{}]),
     game: (r) => rec('game', r, () => games[r] || null), players: (r) => rec('players', r, () => players[r] || []), castStatus: () => rec('cast', null, { cast: [] }),
     setShow: (id, p) => rec('setShow', p, { ok: true }), captain: (room, a) => rec('captain', { room, a }, null), leBallot: () => rec('leBallot', null, null),
     openVote: (id, v) => rec('openVote', v, { ok: true, id: 7 }), tally: () => rec('tally', null, { counts: {}, total: 0 }), setPrize: () => rec('setPrize', null, { ok: true }),
+    // ev_set_host: the reply carries the host's last tap and when their phone last asked
+    setHost: (id, st) => rec('setHost', st, () => Object.assign({ ok: true, cmd: null, seen: null, now: Date.now() }, host)),
     addLeBot: (room, name, slogan) => rec('addLeBot', { room, name, slogan }, () => { const p = { id: 'b' + (players[room] || []).length, name, is_bot: true, le: { role: 'run', voter: false, slogan } }; players[room] = (players[room] || []).concat(p); return p; }) };
   const store = { read: (k, f) => (k in m ? JSON.parse(m[k]) : f), write: (k, v) => { m[k] = JSON.stringify(v); } };
   let state = Engine.initial(SHOW, Date.now());
@@ -89,7 +91,8 @@ function setup() {
   n.attach(SHOW);
   const at = (id) => Object.assign({}, SHOW.cues.find((c) => c.id === id), { round: 1 });
   const go = async (id) => { state = Engine.reduce(SHOW, state, { type: 'jump', cue: id, force: true }, Date.now()).state; await n.cueChanged(null, at(id), state); };
-  return { n, calls, games, players, at, go, captains: () => calls.filter((c) => c[0] === 'captain').map((c) => c[1].a) };
+  return { n, calls, games, players, host, at, go, captains: () => calls.filter((c) => c[0] === 'captain').map((c) => c[1].a),
+    hosts: () => calls.filter((c) => c[0] === 'setHost').map((c) => c[1]) };
 }
 
 test('in a game cue GO plays the game; outside one, or when the game is done, GO moves the cue list', async () => {
@@ -170,4 +173,70 @@ test('test bots in the Lesser Evil lobby: seated ready to run, distinct names, l
   await t.n._tick();
   const snap = t.n.snapshot(null, t.at('505'), true);
   assert.equal(snap.prize, null); assert.equal(snap.prizeNobody, 'Bot Juniper', 'the console says a bot won: no prize');
+});
+
+test('the host’s phone: the cue, the game’s screen, the suspects and the deal; its taps choose suspects, each tap once', async () => {
+  const t = setup();
+  t.host.cmd = { n: 4, type: 'nominee', id: 'p2' };   // a tap from before this launcher started: not acted on
+  await t.n._tick(); await t.n._tick();
+  const room = t.n._saved().rooms.cv;
+  await t.go('505');
+  t.players[room] = [{ id: 'p1', name: 'Ava' }, { id: 'p2', name: 'Bram' }, { id: 'p3', name: 'Cleo', is_bot: true }];
+  t.games[room] = { id: room, phase: 'day', night_number: 1, round_number: 1, floor: { status: 'discussion' } };
+  const ends = Date.now() + 30000;
+  t.n.setHostCue({ started: true, cue: { id: '505', title: 'The game', say: 'Here we go', segment: 'Vessels' }, next: null, timer: { endsAt: ends }, safety: 'Hold', reconnecting: ['Ava'] });
+  t.host.now = Date.now() + 5000;   // the database's clock runs 5 s ahead of this laptop
+  t.host.seen = Date.now() - 1000;
+  await t.n._tick();
+  let st = t.hosts().filter(Boolean).pop();
+  assert.equal(st.cue.say, 'Here we go'); assert.equal(st.safety, 'Hold'); assert.deepEqual(st.reconnecting, ['Ava']);
+  assert.equal(st.game.name, 'Vessels'); assert.match(st.game.title, /discussion/); assert.equal(st.game.blocked, true);
+  assert.deepEqual(st.suspects.map((s) => [s.id, s.on, s.bot]), [['p1', false, false], ['p2', false, false], ['p3', false, true]], 'the old tap was not acted on');
+  assert.deepEqual(st.roles, ['host-demon', 'priest', 'nun', 'townsfolk']);
+  await t.n._tick();
+  st = t.hosts().filter(Boolean).pop();
+  assert.ok(Math.abs(st.timer.endsAt - (ends + 5000)) < 200, 'times go out in the database’s clock');
+  assert.equal(t.n.snapshot(null, t.at('505'), true).host.live, true, 'the console sees the host’s phone');
+  await t.n._tick();
+  assert.equal(t.hosts().pop(), null, 'nothing changed: only asks for taps');
+
+  t.host.cmd = { n: 5, type: 'nominee', id: 'p1' };
+  await t.n._tick();
+  assert.deepEqual(t.n.snapshot(null, t.at('505'), true).nominees, ['p1']);
+  await t.n._tick();
+  assert.deepEqual(t.n.snapshot(null, t.at('505'), true).nominees, ['p1'], 'the same tap twice counts once');
+  st = t.hosts().filter(Boolean).pop();
+  assert.equal(st.suspects.find((s) => s.id === 'p1').on, true, 'the phone sees its tap land');
+  t.host.cmd = { n: 6, type: 'nominee', id: 'p3' }; await t.n._tick();
+  t.host.cmd = { n: 7, type: 'nominee', id: 'p1' }; await t.n._tick();
+  t.host.cmd = { n: 8, type: 'nominee', id: 'zz' }; await t.n._tick();
+  assert.deepEqual(t.n.snapshot(null, t.at('505'), true).nominees, ['p3'], 'a second tap drops them; someone not alive is ignored');
+  t.host.cmd = { n: 9, type: 'nominee', id: 'p2' }; await t.n._tick();
+  assert.equal((await t.n.directorGo()).ok, true, 'two suspects from the host: GO opens the vote');
+
+  t.games[room] = { id: room, phase: 'night', night_number: 2, round_number: 2 };
+  await t.n._tick();
+  t.host.cmd = { n: 10, type: 'nominee', id: 'p1' }; await t.n._tick();
+  assert.deepEqual(t.n.snapshot(null, t.at('505'), true).nominees, [], 'no suspects outside the discussion');
+  assert.equal(t.hosts().filter(Boolean).pop().suspects, null);
+});
+
+test('the host’s phone: two quick taps between the launcher’s reads both land; a tap says on or off', async () => {
+  const t = setup();
+  await t.n._tick(); await t.n._tick();
+  const room = t.n._saved().rooms.cv;
+  await t.go('505');
+  t.players[room] = [{ id: 'p1', name: 'Ava' }, { id: 'p2', name: 'Bram' }, { id: 'p3', name: 'Cleo' }];
+  t.games[room] = { id: room, phase: 'day', night_number: 1, round_number: 1, floor: { status: 'discussion' } };
+  await t.n._tick();   // the first reply: no taps yet
+  t.host.cmd = { n: 2, at: 0, list: [{ n: 1, type: 'nominee', id: 'p1', on: true }, { n: 2, type: 'nominee', id: 'p3', on: true }] };
+  await t.n._tick();
+  assert.deepEqual(t.n.snapshot(null, t.at('505'), true).nominees, ['p1', 'p3']);
+  t.n.toggleNominee('p3');   // the operator drops Cleo on the console...
+  t.host.cmd = { n: 3, at: 0, list: t.host.cmd.list.concat({ n: 3, type: 'nominee', id: 'p1', on: true }) };
+  await t.n._tick();   // ...and a tap from a screen a moment behind still says "Ava on": nothing flips
+  assert.deepEqual(t.n.snapshot(null, t.at('505'), true).nominees, ['p1']);
+  t.host.cmd = { n: 4, at: 0, list: t.host.cmd.list.concat({ n: 4, type: 'nominee', id: 'p1', on: false }) };
+  await t.n._tick();
+  assert.deepEqual(t.n.snapshot(null, t.at('505'), true).nominees, []);
 });
