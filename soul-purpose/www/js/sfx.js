@@ -41,6 +41,7 @@
     buzz:  (c) => tone(c, { freq: 110, to: 100, dur: 0.25, type: 'square', gain: 0.09 }),
     full:  (c) => { tone(c, { freq: 160, to: 60, dur: 0.3, type: 'square', gain: 0.12 }); },
     swap:  (c) => tone(c, { freq: 500, to: 700, dur: 0.1, type: 'triangle', gain: 0.12 }),
+    bell:  (c) => { tone(c, { freq: 2093, to: 2080, dur: 0.6, type: 'sine', gain: 0.14 }); tone(c, { freq: 4186, to: 4170, dur: 0.35, type: 'sine', gain: 0.05 }); },
     reveal:(c) => { tone(c, { freq: 523, dur: 0.12 }); tone(c, { freq: 659, dur: 0.12, delay: 0.1 }); tone(c, { freq: 784, dur: 0.2, delay: 0.2 }); },
   };
 

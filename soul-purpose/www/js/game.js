@@ -3,7 +3,7 @@
  */
 (function () {
   'use strict';
-  const { data, scoring, sfx } = window.SP;
+  const { data, scoring, sfx, art } = window.SP;
   const T = scoring.TUNING;
   const CAP = T.SIDE_CAPACITY;
   const TOTAL = T.SOULS_PER_TYPE * 2;
@@ -65,14 +65,34 @@
     try { localStorage.setItem(LAST_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ }
   }
 
-  // ---------------- placeholder art ----------------
-  function beanHTML(hue, cls = '') {
-    return `<div class="bean ${cls}" style="--body:hsl(${hue} 75% 74%)"><i class="eye"></i><i class="eye"></i><i class="mouth"></i></div>`;
+  // ---------------- art helpers (the drawings themselves are in art.js) ----------------
+  /** Gary's mouth flaps while a line is up. */
+  function talk(svg, ms = 1300) {
+    if (!svg) return;
+    svg.classList.add('talking');
+    clearTimeout(svg._talk);
+    svg._talk = setTimeout(() => svg.classList.remove('talking'), ms);
   }
-  function garyHTML(cls = '') {
-    return `<div class="gary ${cls}" role="img" aria-label="Gary, a tired grey cloud">
-      <div class="gary-cloud"><i class="eye"></i><i class="eye"></i><i class="mouth"></i></div><i class="tie"></i><div class="mug"></div></div>`;
+  /** The front desk: Gary behind it, his speech bubble, the bell and the wilting plant. */
+  function deskHTML(big = false) {
+    return `<div class="desk${big ? ' desk-big' : ''}">
+      <div class="desk-gary">${art.gary()}</div>
+      ${big ? '' : '<div class="gary-bubble" aria-live="polite"></div>'}
+      <div class="desk-counter"><i class="desk-top"></i><i class="desk-front"></i></div>
+      <button class="desk-bell" type="button" aria-label="Ring the bell">${art.bell()}</button>
+      <div class="desk-plant">${art.plant()}</div>
+    </div>`;
   }
+  function wireDesk(node) {
+    const b = node.querySelector('.desk-bell');
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sfx.play('bell');
+      b.classList.remove('ring'); void b.offsetWidth; b.classList.add('ring');
+    });
+    return node.querySelector('.desk-gary .gary');
+  }
+  const soulSVG = (soul, opts) => art.soul(soul.look, opts);
 
   // ---------------- mute (every screen) ----------------
   const muteBtn = document.getElementById('mute');
@@ -93,7 +113,9 @@
 
   // ---------------- run ----------------
   function newRun() {
-    const souls = scoring.drawSouls(data.SOULS).map((s) => Object.assign(s, { hue: randInt(0, 359) }));
+    const souls = scoring.drawSouls(data.SOULS);
+    const looks = art.makeLooks(souls.length);
+    souls.forEach((s, i) => { s.look = looks[i]; });
     return {
       souls,
       universeDark: scoring.universeDark(souls), // stored once, ties already broken
@@ -113,13 +135,19 @@
     const lastLine = last && data.ARCHETYPES[last.archetype]
       ? `<p class="last-result">Last shift: ${esc(data.ARCHETYPES[last.archetype].name)}, headed to ${esc(data.PLACES[last.place].name)}</p>`
       : '';
+    const propKeys = scoring.shuffle(Object.keys(art.PROPS), Math.random);
+    const ghosts = art.makeLooks(3).map((look, i) => art.soul(look, { prop: propKeys[i], cls: 'bob bob-' + (i + 1) })).join('');
     const node = el(`<section class="screen title-screen">
-      <div class="title-ghosts">${beanHTML(190, 'bob')}${beanHTML(325, 'bob bob-2')}${beanHTML(48, 'bob bob-3')}</div>
-      <h1 class="logo">SOUL<br>PURPOSE</h1>
-      <p class="tagline">Afterlife Front Desk<br>New Clerk Orientation</p>
-      <button class="btn btn-big" data-act="play">PLAY</button>
-      ${lastLine}
-      ${DEBUG ? '<button class="btn btn-small" data-act="auto">Debug: auto-sort 20 souls</button>' : ''}
+      ${art.scene('dark', 'half half-left')}${art.scene('light', 'half half-right')}
+      <div class="title-inner">
+        <p class="eyebrow">Afterlife Front Desk</p>
+        <h1 class="logo"><span>SOUL</span><span>PURPOSE</span></h1>
+        <div class="title-ghosts">${ghosts}</div>
+        <button class="btn btn-big" data-act="play">PLAY</button>
+        <p class="tagline">New clerk orientation. Twenty souls. No middle ground.</p>
+        ${lastLine}
+        ${DEBUG ? '<button class="btn btn-small" data-act="auto">Debug: auto-sort 20 souls</button>' : ''}
+      </div>
     </section>`);
     stage.appendChild(node);
     node.querySelector('[data-act=play]').addEventListener('click', () => { sfx.play('tap'); go(introScreen); });
@@ -131,20 +159,24 @@
   function introScreen() {
     const beats = data.GARY.intro;
     let i = 0;
-    const node = el(`<section class="screen intro-screen">
+    const node = el(`<section class="screen intro-screen office">
       <button class="btn btn-small skip" data-act="skip">SKIP</button>
-      ${garyHTML('gary-big bob')}
+      <div class="wall-clock" aria-hidden="true"><i></i><i></i></div>
+      <div class="wall-poster" aria-hidden="true">YOU'RE<br>DOING<br>FINE</div>
       <div class="speech"><p class="speech-text"></p></div>
       <p class="hint">tap to continue</p>
       <div class="beat-dots">${beats.map(() => '<i></i>').join('')}</div>
+      ${deskHTML(true)}
     </section>`);
     stage.appendChild(node);
+    const garySvg = wireDesk(node);
     const text = node.querySelector('.speech-text');
     const dots = node.querySelectorAll('.beat-dots i');
     const show = () => {
       text.textContent = beats[i];
       dots.forEach((d, k) => d.classList.toggle('on', k <= i));
       text.parentElement.classList.remove('pop'); void text.offsetWidth; text.parentElement.classList.add('pop');
+      talk(garySvg, 900 + beats[i].length * 25);
     };
     const start = () => { run = newRun(); go(sortScreen); };
     node.querySelector('[data-act=skip]').addEventListener('click', (e) => { e.stopPropagation(); sfx.play('tap'); start(); });
@@ -165,17 +197,18 @@
         <div class="counter counter-light"><span>LIGHT</span><b data-count="light">0/${CAP}</b></div>
       </header>
       <div class="arena">
-        <div class="door door-dark" data-door="dark"><span class="door-label">THE DARK PLACE</span><span class="full-sign">FULL</span></div>
-        <div class="door door-light" data-door="light"><span class="door-label">THE LIGHT PLACE</span><span class="full-sign">FULL</span></div>
+        <div class="door door-dark" data-door="dark">${art.scene('dark')}<span class="door-label">THE DARK PLACE</span><div class="shutter"><span class="full-sign">FULL</span></div></div>
+        <div class="door door-light" data-door="light">${art.scene('light')}<span class="door-label">THE LIGHT PLACE</span><div class="shutter"><span class="full-sign">FULL</span></div></div>
         <div class="card-slot"></div>
       </div>
       <div class="sort-buttons">
         <button class="btn btn-dark" data-act="dark" aria-label="Send to the Dark Place">&larr; DARK</button>
         <button class="btn btn-light" data-act="light" aria-label="Send to the Light Place">LIGHT &rarr;</button>
       </div>
-      <div class="gary-dock">${garyHTML('gary-small')}<div class="gary-bubble" aria-live="polite"></div></div>
+      ${deskHTML()}
     </section>`);
     stage.appendChild(node);
+    const garySvg = wireDesk(node);
 
     const arena = node.querySelector('.arena');
     const slot = node.querySelector('.card-slot');
@@ -192,6 +225,7 @@
       bubble.classList.remove('pop'); void bubble.offsetWidth; bubble.classList.add('pop');
       clearTimeout(sayTimer);
       sayTimer = later(() => bubble.classList.remove('pop'), FEEL.QUIP_MS);
+      talk(garySvg, 700 + text.length * 30);
     }
 
     function paintCounts() {
@@ -215,8 +249,9 @@
     function nextSoul() {
       const soul = run.souls[run.index];
       ticket.textContent = pad2(run.index + 1);
-      const card = el(`<div class="card" role="group" aria-label="Soul ${run.index + 1} of ${TOTAL}: ${esc(soul.name)}">
-        <div class="card-fig">${beanHTML(soul.hue, 'bob')}<span class="prop-tag">holding ${esc(soul.propLabel)}</span></div>
+      const card = el(`<div class="card" role="group" aria-label="Soul ${run.index + 1} of ${TOTAL}: ${esc(soul.name)}, holding ${esc(soul.propLabel)}">
+        <div class="card-head" aria-hidden="true"><span>SOUL INTAKE FORM</span><span>No. ${pad2(run.index + 1)}</span></div>
+        <div class="card-fig">${soulSVG(soul, { prop: soul.prop, cls: 'bob talky' })}</div>
         <h2 class="soul-name">${esc(soul.name)}</h2>
         <div class="bubble"><p class="confession"></p></div>
         <p class="excuse">&ldquo;${esc(soul.excuse)}&rdquo;</p>
@@ -432,14 +467,14 @@
 
     const node = el(`<section class="screen reorg-screen">
       <header class="reorg-top">
-        ${garyHTML('gary-small')}
+        ${art.gary('gary-small')}
         <div class="gary-bubble pop static">${esc(data.GARY.reorganize)}</div>
       </header>
       <p class="reorg-help">Tap one soul in each column to swap them.</p>
       <p class="reorg-detail" aria-live="polite">&nbsp;</p>
       <div class="cols">
-        <div class="col col-dark"><h3>DARK</h3><div class="col-list" data-col="dark"></div></div>
-        <div class="col col-light"><h3>LIGHT</h3><div class="col-list" data-col="light"></div></div>
+        <div class="col col-dark">${art.scene('dark')}<h3>DARK</h3><div class="col-list" data-col="dark"></div></div>
+        <div class="col col-light">${art.scene('light')}<h3>LIGHT</h3><div class="col-list" data-col="light"></div></div>
       </div>
       <footer class="reorg-foot">
         <span class="swap-count">Swaps: <b>0</b></span>
@@ -447,6 +482,7 @@
       </footer>
     </section>`);
     stage.appendChild(node);
+    talk(node.querySelector('.reorg-top .gary'), 1800);
     const lists = { light: node.querySelector('[data-col=light]'), dark: node.querySelector('[data-col=dark]') };
     const detail = node.querySelector('.reorg-detail');
     const swapCount = node.querySelector('.swap-count b');
@@ -456,7 +492,7 @@
         lists[side].innerHTML = run.souls
           .filter((s) => run.placement[s.id] === side)
           .map((s) => `<button class="mini${sel[side] === s.id ? ' selected' : ''}${flash.includes(s.id) ? ' just-swapped' : ''}" data-id="${s.id}">
-              <i class="dot" style="--body:hsl(${s.hue} 75% 74%)"></i><b>${esc(s.name)}</b><span>${esc(s.confession)}</span></button>`)
+              <span class="mini-av">${soulSVG(s, {})}</span><b>${esc(s.name)}</b><span class="mini-conf">${esc(s.confession)}</span></button>`)
           .join('');
       }
     }
@@ -543,6 +579,7 @@
             if (!step.busy) return;
             step.busy = false;
             v.classList.add('show');
+            node.classList.add('show-' + place);
             if (extra) extra.classList.add('show');
             sfx.play(place);
           };
@@ -569,14 +606,16 @@
       },
     ];
 
-    const node = el(`<section class="screen results-screen">
-      <div class="results-gary">${garyHTML('gary-small bob')}</div>
+    const node = el(`<section class="screen results-screen office">
+      ${art.scene('light', 'res-scene res-light')}${art.scene('dark', 'res-scene res-dark')}
+      <div class="results-gary">${art.gary('gary-results')}</div>
       <div class="reveal" aria-live="polite"></div>
       <p class="hint">tap to continue</p>
       <div class="beat-dots">${steps.map(() => '<i></i>').join('')}</div>
     </section>`);
     stage.appendChild(node);
     const view = node.querySelector('.reveal');
+    const garySvg = node.querySelector('.results-gary .gary');
     const hint = node.querySelector('.hint');
     const dots = node.querySelectorAll('.beat-dots i');
     let i = -1;
@@ -593,6 +632,7 @@
       hint.style.visibility = st.last ? 'hidden' : 'visible';
       if (st.enter) st.enter(view, st);
       if (i > 0) sfx.play('tap');
+      talk(garySvg, st.last ? 900 : 1500);
       if (st.last) {
         view.querySelector('[data-act=again]').addEventListener('click', (e) => { e.stopPropagation(); sfx.play('tap'); run = newRun(); go(sortScreen); });
         view.querySelector('[data-act=title]').addEventListener('click', (e) => { e.stopPropagation(); sfx.play('tap'); go(titleScreen); });
@@ -604,7 +644,7 @@
     let taps = 0, tapTimer = null;
     node.querySelector('.results-gary').addEventListener('click', (e) => {
       e.stopPropagation();
-      const g = e.currentTarget.firstElementChild;
+      const g = garySvg;
       g.classList.remove('poke'); void g.offsetWidth; g.classList.add('poke');
       taps++;
       clearTimeout(tapTimer);
