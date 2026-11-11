@@ -15,7 +15,7 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
 const page = await ctx.newPage();
 const external = [];
-page.on('request', (r) => { if (!r.url().startsWith('file:')) external.push(r.url()); });
+page.on('request', (r) => { if (!/^(file|blob|data):/.test(r.url())) external.push(r.url()); }); // blob:/data: are in-memory
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -145,7 +145,23 @@ await shot('12-results-verdict');
 await page.click('.reveal'); await sleep(400);
 await shot('13-results-home');
 await page.click('.reveal'); await sleep(400);
+await page.waitForSelector('.share-img[data-ready]', { timeout: 15000 });
 await shot('14-results-final');
+/** Save the share card PNG the page made, and return its pixel size. */
+async function saveCard(name) {
+  const { b64, w, h } = await page.evaluate(async () => {
+    const img = document.querySelector('.share-img');
+    const buf = await (await fetch(img.src)).arrayBuffer();
+    let bin = ''; const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return { b64: btoa(bin), w: img.naturalWidth, h: img.naturalHeight };
+  });
+  fs.writeFileSync(path.join(out, name + '.png'), Buffer.from(b64, 'base64'));
+  return [w, h];
+}
+const [cw, chh] = await saveCard('card-real');
+check(cw === 1080 && chh === 1920, `share card is 1080x1920 (got ${cw}x${chh})`);
+check(await page.locator('[data-act=save]:not([disabled])').count() === 1, 'SAVE IMAGE is ready');
 
 // Debug panel: tap Gary 5 times.
 for (let k = 0; k < 5; k++) { await page.click('.results-gary'); await sleep(80); }
@@ -168,13 +184,17 @@ for (const k of keys) {
     await page.selectOption('[data-f=place]', p);
     await page.click('[data-act=force]');
     for (let t = 0; t < 4; t++) { await page.click('.reveal'); await sleep(t === 1 ? 1500 : 120); }
-    const txt = await page.locator('.summary').textContent();
+    await page.waitForSelector('.share-img[data-ready]', { timeout: 15000 });
+    const txt = await page.locator('.share-img').getAttribute('alt');
+    const size = await page.evaluate(() => [document.querySelector('.share-img').naturalWidth, document.querySelector('.share-img').naturalHeight]);
+    if (size[0] !== 1080 || size[1] !== 1920) fail(`forced ${k}/${p} card is ${size}`);
+    if (['stickyNote-dark', 'hotTake-light', 'overthinkingAngel-dark', 'hallMonitor-dark'].includes(k + '-' + p)) await saveCard(`card-${k}-${p}`);
     const want = await page.evaluate(([k, p]) => [window.SP.data.ARCHETYPES[k].name, window.SP.data.HOMES[k][p].name], [k, p]);
     if (txt.includes(want[0]) && txt.includes(want[1])) rendered++;
     else fail(`forced ${k}/${p} rendered "${txt}"`);
   }
 }
-check(rendered === 16, 'all 16 archetype x place results render when forced');
+check(rendered === 16, 'all 16 archetype x place results render when forced, each with a 1080x1920 share card');
 
 // Play again starts a fresh, different run.
 await page.click('[data-act=again]');

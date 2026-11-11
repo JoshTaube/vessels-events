@@ -6,7 +6,7 @@ tells you who *you* are. The full design is in [SOUL-PURPOSE-SPEC.md](SOUL-PURPO
 **To play:** open `www/index.html` in a browser (on a phone, or in desktop dev tools at a phone size). There's no build
 step, no network and no dependencies. On a desktop you can use the arrow keys instead of swiping.
 
-## Status: build steps 1-4 of 7 (playable, art pass done)
+## Status: build steps 1-5 of 7
 
 | Step | What | State |
 |---|---|---|
@@ -14,33 +14,41 @@ step, no network and no dependencies. On a desktop you can use the arrow keys in
 | 2 | Reorganize round | done |
 | 3 | Scoring and results screens (text only) | done |
 | 4 | Art pass: procedural ghosts, props, front desk, both sides, Gary | done |
-| 5 | Home illustrations and share card | next |
-| 6 | Sound and juice (stamps, flies, screen shake) | |
+| 5 | Home illustrations and share card | done |
+| 6 | Sound and juice (stamps, flies, screen shake) | next |
 | 7 | Playtest pass: tune thresholds | |
 
 All art is drawn in code as SVG and CSS (`js/art.js`); there are no image files. Each soul is a procedural bean ghost
-with a random body color, eye style, mouth and hat or hairdo, holding the prop for its sin in rubber-hose arms. Still
-placeholder: the home illustrations (step 5) and the sounds (simple blips until step 6).
+with a random body color, eye style, mouth and hat or hairdo, holding the prop for its sin in rubber-hose arms. The 16
+homes are in `js/homes.js`. Still placeholder: the sounds (simple blips until step 6).
+
+**Share card:** the last results step draws a 1080x1920 PNG (an Instagram story) on a canvas: archetype, verdict, the
+home picture and its description, and Gary's sign-off with your stats. SHARE uses the phone's share sheet where the
+browser can share files (iOS Safari, Android Chrome); SAVE IMAGE downloads it; press-and-hold on the preview saves it
+too.
 
 Fonts: Lilita One (display) and Nunito (body), both SIL Open Font License 1.1, are in `www/fonts/` with their
-licenses. Browsers refuse font files on pages opened straight from disk, so `css/fonts.css` embeds them; rebuild it
-with `node soul-purpose/tools/embed-fonts.mjs` if the fonts change.
+licenses. Browsers refuse font files on pages opened straight from disk, and the share card needs the font data to
+draw SVG text on a canvas, so `js/fonts.js` embeds them; rebuild it with `node soul-purpose/tools/embed-fonts.mjs` if
+the fonts change.
 
 ## Files
 
 ```
 www/                  self-contained, ready to wrap in Capacitor later
   index.html
-  css/fonts.css       the two fonts, embedded (generated)
   css/style.css
   fonts/              Lilita One + Nunito woff2, with OFL licenses
+  js/fonts.js         the two fonts, embedded (generated)
   js/data.js          souls, archetypes, homes, Gary's lines. Edit text here.
   js/scoring.js       run setup + every scoring rule. Tuning constants at the top.
   js/sfx.js           WebAudio blips + the mute setting
   js/art.js           every drawing: ghosts, 30 props, Gary, the desk, both afterlife scenes
+  js/homes.js         the 16 home illustrations
+  js/share.js         the 1080x1920 share card
   js/game.js          screens, swipe engine, reorganize, results, debug panel. Feel constants at the top.
 tests/scoring.test.mjs   the scoring rules from spec section 5
-tools/embed-fonts.mjs    rebuilds css/fonts.css from www/fonts/
+tools/embed-fonts.mjs    rebuilds js/fonts.js from www/fonts/
 tools/playtest.mjs       plays a full run in a phone-sized browser with real drags, checks the rules, saves screenshots
 ```
 

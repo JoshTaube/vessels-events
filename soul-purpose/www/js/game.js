@@ -3,7 +3,7 @@
  */
 (function () {
   'use strict';
-  const { data, scoring, sfx, art } = window.SP;
+  const { data, scoring, sfx, art, homes, share } = window.SP;
   const T = scoring.TUNING;
   const CAP = T.SIDE_CAPACITY;
   const TOTAL = T.SOULS_PER_TYPE * 2;
@@ -589,20 +589,25 @@
       },
       {
         html: `<p class="kicker">Your new home in ${esc(P.name)}</p>
-          <div class="home-art home-${place}" aria-hidden="true"><span>illustration<br>coming in the art pass</span></div>
+          <div class="home-art home-${place}">${homes.draw(archetype, place)}</div>
           <h2 class="home-name">${esc(HOME.name)}</h2>
           <p class="home-desc">${esc(HOME.description)}</p>`,
       },
       {
         last: true,
-        html: `<div class="summary summary-${place}">
-            <p class="kicker">Soul Purpose: clerk file</p>
-            <h2 class="arch-name">${esc(A.name)}</h2>
-            <p class="summary-line">is going to <b>${esc(P.name)}</b></p>
-            <p class="summary-line">and will live in <b>${esc(HOME.name)}</b></p>
+        html: `<div class="share-card">
+            <img class="share-img" alt="Clerk file: ${esc(A.name)}, going to ${esc(P.name)}, living in ${esc(HOME.name)}">
+            <p class="share-status">Printing your clerk file...</p>
           </div>
-          <button class="btn btn-big" data-act="again">PLAY AGAIN</button>
-          <button class="btn btn-small" data-act="title">Back to title</button>`,
+          <div class="share-btns">
+            <button class="btn btn-share" data-act="share" hidden>SHARE</button>
+            <button class="btn btn-save" data-act="save" disabled>SAVE IMAGE</button>
+          </div>
+          <p class="share-hint">Or press and hold the picture to save it.</p>
+          <div class="end-btns">
+            <button class="btn btn-big" data-act="again">PLAY AGAIN</button>
+            <button class="btn btn-small" data-act="title">Back to title</button>
+          </div>`,
       },
     ];
 
@@ -633,12 +638,60 @@
       if (st.enter) st.enter(view, st);
       if (i > 0) sfx.play('tap');
       talk(garySvg, st.last ? 900 : 1500);
+      node.classList.toggle('final', !!st.last);
       if (st.last) {
+        shareStep();
         view.querySelector('[data-act=again]').addEventListener('click', (e) => { e.stopPropagation(); sfx.play('tap'); run = newRun(); go(sortScreen); });
         view.querySelector('[data-act=title]').addEventListener('click', (e) => { e.stopPropagation(); sfx.play('tap'); go(titleScreen); });
       }
     }
     node.addEventListener('click', next);
+
+    // The share card: one 1080x1920 PNG, then SHARE (where the device can share files) and SAVE.
+    function shareStep() {
+      const img = view.querySelector('.share-img');
+      const status = view.querySelector('.share-status');
+      const shareBtn = view.querySelector('[data-act=share]');
+      const saveBtn = view.querySelector('[data-act=save]');
+      const fname = `soul-purpose-${archetype}-${place}.png`;
+      const text = `I'm ${A.name}, and I'm going to ${P.name}. My home: ${HOME.name}.`;
+      let url = null;
+      const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+      share.makeCard({
+        archetype: A, place, placeName: P.name, home: HOME, chips,
+        homeSVG: homes.draw(archetype, place), garySVG: art.gary(),
+        stats: `${fmtSec(s.avgMs)} average decision  ·  ${plural(s.totalWobbles, 'wobble')}  ·  ${plural(s.swaps, 'swap')}`,
+      }).then((blob) => {
+        if (!img.isConnected) return;
+        url = URL.createObjectURL(blob);
+        cleanup.push(() => URL.revokeObjectURL(url));
+        img.onload = () => { img.dataset.ready = '1'; };
+        img.src = url;
+        status.hidden = true;
+        saveBtn.disabled = false;
+        let file = null;
+        try { file = new File([blob], fname, { type: 'image/png' }); } catch (e) { /* old browsers */ }
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+          shareBtn.hidden = false;
+          shareBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sfx.play('tap');
+            navigator.share({ files: [file], title: 'Soul Purpose', text }).catch(() => { /* cancelled */ });
+          });
+        }
+      }).catch((err) => {
+        status.textContent = "The printer jammed. Couldn't make your clerk file (" + err.message + ').';
+      });
+      saveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!url) return;
+        sfx.play('tap');
+        const a = document.createElement('a');
+        a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+      });
+      img.addEventListener('click', (e) => e.stopPropagation());
+    }
 
     // Hidden debug panel: tap Gary 5 times.
     let taps = 0, tapTimer = null;
